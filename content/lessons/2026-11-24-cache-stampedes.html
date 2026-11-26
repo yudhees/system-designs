@@ -1,0 +1,465 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>System Design Lab — Cache Stampedes (2026-11-24)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (~68ch) that widens to a full-bleed instrument bench for the simulator */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunk:#e4e9ee; --ink:#14202b; --muted:#566573; --line:#d3dbe3;
+  --accent:#2350d8; --accent-ink:#ffffff;
+  --hit:#0f8068; --stale:#b06f12; --miss:#c4352b; --wait:#6c43bd;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e141a; --surface:#151e27; --sunk:#1b2631; --ink:#e3eaf0; --muted:#94a4b3; --line:#283644;
+  --accent:#7d9cff; --accent-ink:#0e141a;
+  --hit:#3cc6a4; --stale:#e6a94a; --miss:#ff6c5f; --wait:#a88cf2; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e141a; --surface:#151e27; --sunk:#1b2631; --ink:#e3eaf0; --muted:#94a4b3; --line:#283644;
+  --accent:#7d9cff; --accent-ink:#0e141a;
+  --hit:#3cc6a4; --stale:#e6a94a; --miss:#ff6c5f; --wait:#a88cf2; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.col{max-width:760px;margin:0 auto}
+.wide{max-width:1180px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(2rem,5vw,3.1rem);font-weight:800;letter-spacing:-.02em}
+h2{font-size:1.6rem;font-weight:700;letter-spacing:-.01em}
+h3{font-size:1.1rem;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+code{background:var(--sunk);padding:.08em .35em;border-radius:4px}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+section{padding-block:48px 0;display:flex;flex-direction:column;gap:18px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.muted{color:var(--muted)}
+
+header.hero{padding-block:56px 8px;display:flex;flex-direction:column;gap:18px}
+.lede{font-size:1.15rem;max-width:62ch}
+.formula{font-family:var(--f-mono);font-size:1rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-x:auto}
+
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.fact b{font-family:var(--f-display);font-size:1.7rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.fact span{font-size:.9rem;color:var(--muted)}
+.fact a{font-size:.78rem}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:.92rem}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;white-space:nowrap}
+
+/* bench */
+.bench{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:18px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px}
+.ctl{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ctl label{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;color:var(--muted)}
+.ctl output{font-family:var(--f-mono);color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button,.btn{font:500 .85rem var(--f-body);border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:7px 12px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:hover,.seg button:hover{border-color:var(--accent)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.clock{margin-left:auto;font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.stratnote{font-size:.9rem;background:var(--sunk);border-radius:8px;padding:10px 12px}
+.lanes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:860px){.lanes{grid-template-columns:1fr}}
+.lane{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0;background:var(--bg)}
+.lane h3{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.lane h3 small{font:400 .8rem var(--f-mono);color:var(--muted)}
+canvas{display:block;width:100%}
+.cv-lane{height:210px}
+.cv-chart{height:84px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.metric{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.metric .k{font-size:.72rem;color:var(--muted);letter-spacing:.04em}
+.metric .v{font-family:var(--f-mono);font-size:1.05rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.metric.bad .v{color:var(--miss)} .metric.warn .v{color:var(--stale)} .metric.ok .v{color:var(--hit)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.chartcap{font-size:.75rem;color:var(--muted);font-family:var(--f-mono)}
+
+/* solve */
+.scenario{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.scenario ul{margin:0;padding-left:1.2em}
+details{border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+details>summary{cursor:pointer;padding:12px 14px;font-weight:600;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"+";display:inline-block;width:1.2em;font-family:var(--f-mono);color:var(--accent)}
+details[open]>summary::before{content:"–"}
+details .body{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px}
+details.answer{border-color:var(--accent)}
+.body ol,.body ul{margin:0;padding-left:1.25em;display:flex;flex-direction:column;gap:6px}
+pre{margin:0;background:var(--sunk);border-radius:8px;padding:12px 14px;overflow-x:auto;font-family:var(--f-mono);font-size:.82rem;line-height:1.5}
+pre code{background:none;padding:0}
+.map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.map>div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.sources ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;font-size:.92rem}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+
+<header class="hero col">
+  <div class="eyebrow">System Design Lab · 2026-11-24 · Caching</div>
+  <h1>Cache stampedes and request coalescing</h1>
+  <p class="lede">A hot key expires. For the next δ seconds, every reader misses and goes to the origin. With an arrival rate λ on that key and a recompute time δ, the origin takes roughly λ·δ concurrent requests for one value. A cache that is meant to protect the origin can end up overloading it.</p>
+  <div class="formula">concurrent origin hits at expiry ≈ λ<sub>key</sub> × δ<sub>recompute</sub> &nbsp;&nbsp;// e.g. 50 req/s × 0.5 s ≈ 25 (Fastly's example)</div>
+</header>
+
+<section class="col">
+  <div class="eyebrow">The real problem</div>
+  <h2>What scale forced the design</h2>
+  <p>Facebook's memcache tier, described in the 2013 NSDI paper, <em>handles billions of requests per second and holds trillions of items</em>. They hit two related failures on keys with heavy read and write traffic. One was <strong>stale sets</strong>, where a slow writer puts an outdated value back into the cache. The other was <strong>thundering herds</strong>, where every reader that misses goes to MySQL at once. Their fix was <strong>leases</strong>. On a miss, memcached gives the client a 64-bit token, and only the holder of that token may set the value. To stop herds, each server hands out a token only once every 10 seconds per key. Other readers are told to wait briefly and retry, and by then the value is usually in the cache.</p>
+  <div class="facts">
+    <div class="fact"><b>17K/s</b><span>Peak DB query rate in Facebook's thundering-herd test without leases</span><a href="https://pdos.csail.mit.edu/6.824/papers/memcache-fb.pdf">Nishtala et al., NSDI '13</a></div>
+    <div class="fact"><b>1.3K/s</b><span>Peak DB query rate in the same test with leases, about a 13× reduction</span><a href="https://pdos.csail.mit.edu/6.824/papers/memcache-fb.pdf">Nishtala et al., NSDI '13</a></div>
+    <div class="fact"><b>1 / 10 s</b><span>Default rate at which a server issues a lease token for each key</span><a href="https://pdos.csail.mit.edu/6.824/papers/memcache-fb.pdf">Nishtala et al., NSDI '13</a></div>
+    <div class="fact"><b>~25</b><span>Concurrent origin fetches for an object requested 50×/s with 500 ms fetch latency, before collapsing</span><a href="https://www.fastly.com/documentation/guides/concepts/cache/request-collapsing/">Fastly docs</a></div>
+  </div>
+  <p>The same problem appears at the CDN layer. Cloudflare's write-up starts from an image service that gets 10 req/s while its origin can serve 1. When the cached copy expires, all 10 go through. Cloudflare's <em>cache lock</em> sends the origin one request at a time per asset, and concurrent misses in a data centre wait for that response. Fastly calls its version a <em>waiting list</em>. CloudFront says it <em>pauses</em> simultaneous requests that share a cache key and fans out the first response to them.</p>
+</section>
+
+<section class="col">
+  <div class="eyebrow">The concept</div>
+  <h2>Four ways to stop the herd, and how each one fails</h2>
+  <p>All four do the same thing: they decouple <em>reader concurrency</em> from <em>origin concurrency</em> for one key. They differ in who pays the latency, what correctness you give up, and which new component can break.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Technique</th><th>Mechanism</th><th>Cost / trade-off</th><th>Failure mode</th></tr></thead>
+    <tbody>
+      <tr><td>Single-flight lock<br><span class="muted mono">request collapsing</span></td><td>First miss takes a per-key lock and fetches. Later misses join a waiting list and get its result.</td><td>Waiters pay the full δ. A distributed lock adds an extra write per refresh.</td><td>The lock holder dies or hangs, so waiters stall until the lock TTL. An uncacheable response forces the queue to go to origin <em>one at a time</em> (Fastly: "sometimes adding several minutes of latency").</td></tr>
+      <tr><td>Stale-while-revalidate</td><td>Serve the expired value now and refresh in the background, ideally behind a single-flight.</td><td>Readers see bounded staleness. Needs a soft TTL and a hard TTL.</td><td>Doesn't help a <em>cold</em> or evicted key, because there is nothing stale to serve. Wrong for data that must be exact, such as the final price at booking.</td></tr>
+      <tr><td>Probabilistic early expiration<br><span class="muted mono">XFetch, VLDB 2015</span></td><td>Each reader recomputes early with a probability that rises as expiry nears: <code>now − δ·β·ln(rand) ≥ expiry</code>.</td><td>No coordination. Needs δ stored with the value. β &gt; 1 refreshes earlier.</td><td>No protection after real expiry, eviction or a flush, which stampede exactly like naive TTL. With very large λ, a few duplicate recomputes still slip through.</td></tr>
+      <tr><td>Leases<br><span class="muted mono">Facebook memcache</span></td><td>A miss returns a token only once per interval per key. Others back off and retry, or accept a stale value.</td><td>Retries add cache round-trips. The token also prevents stale sets.</td><td>If the holder's fetch fails, others wait for the next token window. If the lease interval is longer than the TTL, readers time out.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Two more points. <strong>Synchronised expiry</strong> is a separate trigger. A deploy that flushes the cache, or a batch warm-up, gives thousands of keys the same expiry time. Per-key locks don't help there, but TTL jitter does. And collapsing happens <strong>per collapsing point</strong>. Forty app tasks with in-process single-flight still send up to 40 fetches per key, so you need a shared layer (Redis lock, CDN shield) as well. Fastly's clustering plus shielding gives up to four collapsing points per object.</p>
+</section>
+
+<section class="wide" id="lab">
+  <div class="col stack" style="max-width:760px">
+    <div class="eyebrow">Simulator</div>
+    <h2>Watch the herd form</h2>
+    <p>Both lanes get the <em>same</em> arrival stream over a Zipf-distributed key set, so key 0 is hottest. The left lane is a plain TTL cache. The right lane uses the strategy you pick. The origin models a supplier API. Past its concurrency limit its latency grows, and above 3× the limit it rejects calls immediately with 429s. A rejected fetch leaves the cache empty, so the herd keeps going. Hit <strong>Flush cache</strong> to simulate a deploy, or <strong>Spike ×5</strong> to simulate a promo push.</p>
+  </div>
+  <div class="bench" style="margin-top:18px">
+    <div class="stack" style="gap:8px">
+      <div class="ctl"><label>Right-lane strategy</label>
+        <div class="seg" id="strat" role="group" aria-label="Strategy">
+          <button type="button" data-s="sf" aria-pressed="true">Single-flight lock</button>
+          <button type="button" data-s="swr" aria-pressed="false">Stale-while-revalidate</button>
+          <button type="button" data-s="xf" aria-pressed="false">XFetch (early, probabilistic)</button>
+          <button type="button" data-s="lease" aria-pressed="false">Lease (memcache)</button>
+        </div>
+      </div>
+      <p class="stratnote" id="stratnote"></p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="rate">Request rate <output id="o-rate"></output></label><input type="range" id="rate" min="20" max="2000" step="10" value="300"></div>
+      <div class="ctl"><label for="keys">Hot keys (Zipf) <output id="o-keys"></output></label><input type="range" id="keys" min="1" max="48" step="1" value="12"></div>
+      <div class="ctl"><label for="ttl">TTL <output id="o-ttl"></output></label><input type="range" id="ttl" min="2" max="40" step="1" value="12"></div>
+      <div class="ctl"><label for="jitter">TTL jitter <output id="o-jitter"></output></label><input type="range" id="jitter" min="0" max="50" step="5" value="0"></div>
+      <div class="ctl"><label for="lat">Origin latency δ <output id="o-lat"></output></label><input type="range" id="lat" min="100" max="3000" step="50" value="800"></div>
+      <div class="ctl"><label for="cap">Origin concurrency limit <output id="o-cap"></output></label><input type="range" id="cap" min="2" max="60" step="1" value="12"></div>
+      <div class="ctl"><label for="beta">XFetch β <output id="o-beta"></output></label><input type="range" id="beta" min="0.5" max="4" step="0.1" value="1"></div>
+      <div class="ctl"><label for="speed">Sim speed <output id="o-speed"></output></label><input type="range" id="speed" min="1" max="4" step="1" value="1"></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" id="flush">Flush cache</button>
+      <button class="btn" type="button" id="spike">Spike ×5 (10 s)</button>
+      <button class="btn" type="button" id="pause">Pause</button>
+      <button class="btn" type="button" id="reset">Reset</button>
+      <span class="clock" id="clock">t = 0.0 s</span>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--hit)"></i>cache hit</span>
+      <span><i style="background:var(--stale)"></i>stale served</span>
+      <span><i style="background:var(--wait)"></i>waiting / retrying</span>
+      <span><i style="background:var(--miss)"></i>origin fetch</span>
+      <span>Cache cells: one per key, filled = fresh (fades toward expiry), amber = stale, outlined = refresh in flight</span>
+    </div>
+    <div class="lanes">
+      <div class="lane" id="laneA">
+        <h3>Naive TTL <small>every miss fetches</small></h3>
+        <canvas class="cv-lane"></canvas>
+        <div class="metrics"></div>
+        <canvas class="cv-chart"></canvas>
+        <div class="chartcap">peak in-flight origin calls per 0.5 s · last 60 s · dashed = limit</div>
+      </div>
+      <div class="lane" id="laneB">
+        <h3><span id="bname">Single-flight lock</span> <small id="bsub">one fetch per key</small></h3>
+        <canvas class="cv-lane"></canvas>
+        <div class="metrics"></div>
+        <canvas class="cv-chart"></canvas>
+        <div class="chartcap">peak in-flight origin calls per 0.5 s · last 60 s · dashed = limit</div>
+      </div>
+    </div>
+    <p class="muted" style="font-size:.85rem">Things to try: (1) Single-flight at defaults, then raise keys to 48 and press Flush. The per-key herd disappears, but 48 simultaneous refreshes still hit a limit of 12. Add jitter. (2) XFetch: let it run through a few TTLs, where the right lane stays flat, then Flush. It stampedes like naive. (3) Lease with TTL 5 s. The 10 s token interval is longer than the TTL, so waiters time out. (4) SWR with δ = 3000 ms: p99 stays at cache latency while staleness rises.</p>
+  </div>
+</section>
+
+<section class="col" id="solve">
+  <div class="eyebrow">Solve it</div>
+  <h2>New Year's Eve in Goa</h2>
+  <div class="scenario">
+    <p>Your meta-search API runs as 40 Node.js tasks on Fargate behind an ALB. Search results are priced from a cache keyed by <code>supplier:hotelId:checkin:nights:occupancy</code> with a 15-minute TTL. One wholesale supplier carries most Goa inventory. Its contract:</p>
+    <ul>
+      <li>Hard rate limit of <strong>50 req/s</strong> per API key. Above that it returns 429, and repeated breaches get the key throttled for 10 minutes.</li>
+      <li>Availability call p50 1.2 s, p99 6 s. You time out at 8 s.</li>
+    </ul>
+    <p>At 20:00 marketing pushes a "NYE in Goa" notification. Search traffic jumps to about <strong>500 searches/s</strong> for 30 minutes, spread over roughly 2,000 distinct price keys with a long tail. The heaviest 20 keys take 40% of traffic. To make it worse, a release went out at 19:55 and its deploy hook flushed the price cache.</p>
+    <p><strong>Design the read path for supplier prices so the supplier never sees more than 50 req/s, search p95 stays under 1.5 s, and a supplier outage degrades search instead of breaking it.</strong> State what you would do at the process, cluster and supplier boundaries, and what is allowed to be stale.</p>
+  </div>
+  <details><summary>Hint 1: Size the two herds separately</summary><div class="body"><p>Per-key herd: the top keys get about 500 × 0.4 / 20 = 10 req/s each. With δ ≈ 1.2 s that is about 12 concurrent misses per hot key, times 40 tasks if each collapses only locally. Synchronised herd: after the flush, all 2,000 keys are cold at 20:00 and are all warmed within seconds, so they expire together at 20:15. Even perfect single-flight means 2,000 fetches against 50 req/s, which is 40 s of backlog.</p></div></details>
+  <details><summary>Hint 2: Separate "show a price" from "sell at a price"</summary><div class="body"><p>A search listing can tolerate a price that is a few minutes old. A booking cannot. That split tells you where stale-while-revalidate is safe and where you need a live re-check.</p></div></details>
+  <details><summary>Hint 3: Who is allowed to call the supplier?</summary><div class="body"><p>If any request path can call the supplier directly, the 50 req/s limit is only enforced by hoping. Consider a single admission point that every fetch, foreground or background, has to pass.</p></div></details>
+  <details class="answer"><summary>Reveal model answer</summary><div class="body">
+    <ol>
+      <li><strong>Collapse in two tiers.</strong> In each Node task, keep a <code>Map&lt;key, Promise&gt;</code> single-flight so 12 concurrent local misses become 1. Across tasks, take a Redis lock: <code>SET lock:{key} {token} NX PX 10000</code>, with a TTL above the 8 s supplier timeout so a slow fetch doesn't let a second one start. Losers wait on a short poll with jitter, or on pub/sub, for at most about 1 s, then fall back to stale or "price on request". Release with a compare-and-delete on the token, so a holder that outlived its lock can't delete someone else's.</li>
+      <li><strong>Soft and hard TTL with stale-while-revalidate for search.</strong> Store <code>{price, fetchedAt, softExp, hardExp, delta}</code>, for example soft 15 min (±15% jitter) and hard 2 h. Between soft and hard, serve the cached price and enqueue a refresh. This keeps p95 at cache latency even when the supplier is at p99.</li>
+      <li><strong>Refresh before expiry on hot keys.</strong> Apply the XFetch test with the stored <code>delta</code> on reads. That gives early, decorrelated refresh for hot keys at no coordination cost, and keeps them from ever reaching the soft TTL.</li>
+      <li><strong>One admission point for the supplier.</strong> No request path calls the supplier directly. Foreground misses and background refreshes all go through a shared token bucket (Redis, or a Kafka topic <code>supplier-refresh</code> keyed by key so duplicates land on one partition and can be deduped). Run it below the limit, around 45 req/s, and give interactive cold misses priority over background refreshes. When the bucket is empty, serve stale. If there is no stale value, return the listing without that supplier's rate.</li>
+      <li><strong>Never mass-flush on deploy.</strong> Version the key prefix only when the payload schema changes. If you must start cold, pre-warm the top N keys by traffic from yesterday's logs through the same rate-limited queue, spread over minutes.</li>
+      <li><strong>Make failure cheap.</strong> Cache "no availability" and supplier errors as negative entries with a short TTL (30–60 s) so a failing supplier doesn't get called on every search. Put a circuit breaker on 429s and timeouts that switches the path to stale-only. Serve stale on error.</li>
+      <li><strong>Live re-check at booking.</strong> On "Book", always make one fresh, uncached availability and price call for that single room, protected by an idempotency key. Show a price-change notice if it moved. This is the one place where staleness is not acceptable, and its volume is small.</li>
+    </ol>
+    <p class="muted">Check the numbers. With 2,000 keys and jittered soft TTLs of 12.75–17.25 min, steady-state refresh is about 2,000 / 900 s ≈ 2.2 req/s on average, far under 50. The flush backlog of 2,000 fetches at 45 req/s drains in about 44 s while search serves "price on request" for cold tail keys. The 20 hot keys get prioritised and are warm in under a second.</p>
+  </div></details>
+</section>
+
+<section class="col">
+  <div class="eyebrow">Apply to your stack</div>
+  <h2>Laravel · Node · MongoDB · Kafka · AWS</h2>
+  <div class="map">
+    <div><h3>Laravel</h3><p><code>Cache::flexible($key, [900, 7200], fn)</code> is the built-in stale-while-revalidate. It serves stale in the second window and refreshes in a deferred function after the response. For single-flight, wrap the miss in <code>Cache::lock("lock:$key", 10)-&gt;block(1, fn)</code> and catch <code>LockTimeoutException</code> to fall back to stale.</p></div>
+    <div><h3>Node.js</h3>
+<pre><code>const inflight = new Map();
+function once(key, fn) {
+  if (inflight.has(key)) return inflight.get(key);
+  const p = fn().finally(() =&gt; inflight.delete(key));
+  inflight.set(key, p);
+  return p;
+}</code></pre><p>This is per-task only. Layer the Redis <code>SET NX PX</code> lock behind it, and delete on release with a Lua compare-and-delete on the token.</p></div>
+    <div><h3>MongoDB</h3><p>If MongoDB is the price cache, put <code>softExp</code> and <code>delta</code> in the document and run a TTL index on <code>hardExp</code>. The TTL monitor runs about every 60 s, so don't rely on it for freshness. Check <code>softExp</code> in code.</p></div>
+    <div><h3>Kafka</h3><p>Use a refresh topic keyed by cache key, so duplicates hash to one partition and a consumer can drop a refresh if <code>fetchedAt</code> is already newer. Cap supplier throughput with consumer concurrency plus a shared token bucket, not partition count.</p></div>
+    <div><h3>AWS</h3><p>CloudFront already collapses simultaneous requests that share a cache key. A <code>Cache-Control: private</code>, <code>no-store</code> or <code>max-age=0</code> with min TTL 0 disables collapsing, so check your API's headers. ElastiCache (Redis) holds the locks and buckets. Fargate task count sets your local collapsing fan-out.</p></div>
+  </div>
+</section>
+
+<section class="col sources">
+  <div class="eyebrow">Sources</div>
+  <h2>Read the originals</h2>
+  <ol>
+    <li><a href="https://pdos.csail.mit.edu/6.824/papers/memcache-fb.pdf">Nishtala et al., "Scaling Memcache at Facebook", NSDI 2013</a> (§3.2.1 Leases: 10 s token rate, 17K/s → 1.3K/s)</li>
+    <li><a href="https://engineering.fb.com/core-data/scaling-memcache-at-facebook/">Meta Engineering: Scaling Memcache at Facebook</a></li>
+    <li><a href="https://mail.vldb.org/pvldb/volumes/8/paper/Optimal%20Probabilistic%20Cache%20Stampede%20Prevention">Vattani, Chierichetti, Lowenstein, "Optimal Probabilistic Cache Stampede Prevention", PVLDB 8 (2015)</a></li>
+    <li><a href="https://blog.cloudflare.com/sometimes-i-cache/">Cloudflare blog: "Sometimes I cache: implementing lock-free probabilistic caching"</a></li>
+    <li><a href="https://developers.cloudflare.com/cache/concepts/revalidation/">Cloudflare docs: Revalidation and request collapsing</a></li>
+    <li><a href="https://www.fastly.com/documentation/guides/concepts/cache/request-collapsing/">Fastly docs: Request collapsing</a></li>
+    <li><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/RequestAndResponseBehaviorS3Origin.html">AWS docs: CloudFront request and response behavior (simultaneous requests / collapsing)</a></li>
+    <li><a href="https://laravel.com/docs/12.x/cache">Laravel docs: Cache (<code>Cache::flexible</code>, atomic locks)</a></li>
+    <li><a href="https://en.wikipedia.org/wiki/Cache_stampede">Wikipedia: Cache stampede (XFetch pseudocode, mitigation trade-offs)</a></li>
+  </ol>
+  <p class="muted" style="font-size:.85rem">The simulator is a simplified model: Poisson arrivals, a linear latency penalty past the concurrency limit, and immediate 429s above 3× the limit. The lease lane uses a fixed 10 s token interval, 50 ms retries and a 3 s give-up. Read its numbers for relative behaviour, not as benchmarks.</p>
+</section>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const P={rate:300,keys:12,ttl:12,jitter:0,lat:800,cap:12,beta:1,speed:1,strat:'sf'};
+const DT=0.005, LEASE=10, RETRY=0.05, GIVEUP=3;
+const NOTES={
+  sf:['Single-flight lock','one fetch per key','The first miss for a key fetches. Concurrent misses wait on that in-flight fetch and get its result. Waiters pay δ, and origin concurrency is capped at one per key. Watch what happens when many keys expire together.'],
+  swr:['Stale-while-revalidate','serve stale, refresh behind','Once a value has expired, readers get it instantly as stale and one background refresh runs. Latency stays flat, but cold keys (after a flush) have nothing stale to serve and fall back to naive misses.'],
+  xf:['XFetch','probabilistic early refresh','Each read recomputes early if now − δ·β·ln(rand) ≥ expiry. Hot keys refresh before they expire with no coordination. After real expiry or a flush there is no protection.'],
+  lease:['Lease','token per key every 10 s','A miss gets a token if none was issued in the last 10 s. Everyone else retries every 50 ms. The token holder fills the cache. If the TTL is shorter than the lease interval, or the holder fails, waiters time out after 3 s.']
+};
+let zipf=[];
+function buildZipf(){let s=0;const w=[];for(let i=0;i<P.keys;i++){s+=1/(i+1);w.push(s);}zipf=w.map(x=>x/s);}
+function pickKey(){const r=Math.random();let lo=0,hi=zipf.length-1;while(lo<hi){const m=(lo+hi)>>1;if(zipf[m]<r)lo=m+1;else hi=m;}return lo;}
+function poisson(l){if(l<30){const L=Math.exp(-l);let k=0,p=1;do{k++;p*=Math.random();}while(p>L);return k-1;}
+  const g=Math.sqrt(-2*Math.log(Math.random()||1e-9))*Math.cos(2*Math.PI*Math.random());return Math.max(0,Math.round(l+Math.sqrt(l)*g));}
+
+let simT=0, spikeUntil=-1, paused=false, latP=1, dotP=1;
+const effRate=()=>P.rate*(simT<spikeUntil?5:1);
+
+class Lane{
+  constructor(root,strat){this.root=root;this.strat=strat;this.cv=root.querySelector('.cv-lane');this.ch=root.querySelector('.cv-chart');this.mEl=root.querySelector('.metrics');this.dots=[];this.errFlash=0;this.reset();}
+  reset(){this.keys=Array.from({length:P.keys},()=>({val:false,exp:0,delta:P.lat/1000,fetching:null,leaseAt:-1e9}));
+    this.inflight=[];this.retries=[];this.buckets=[];this.lats=[];this.waiting=0;this.dots=[];}
+  bucket(t){const i=Math.floor(t/0.5);let b=this.buckets[this.buckets.length-1];
+    if(!b||b.i!==i){b={i,origin:0,req:0,hit:0,stale:0,err:0,inMax:0,waitMax:0,retry:0};this.buckets.push(b);if(this.buckets.length>140)this.buckets.shift();}return b;}
+  rec(t,lat){if(Math.random()<latP)this.lats.push(t,lat);}
+  hit(t,b){b.hit++;this.rec(t,0.002);return 'hit';}
+  fetch(k,t,t0,shared,bg){const b=this.bucket(t);const n=this.inflight.length+1,cap=P.cap,base=P.lat/1000;
+    const fail=n>cap*3;
+    const dur=fail?0.06:base*(1+1.5*Math.max(0,(n-cap)/cap))*(0.85+0.3*Math.random());
+    const f={k,start:t,end:t+dur,fail,w:t0==null?[]:[t0]};this.inflight.push(f);b.origin++;
+    if(shared)this.keys[k].fetching=f;
+    if(bg)this.spawn('bg');
+    return 'miss';}
+  request(t,k){const s=this.keys[k],b=this.bucket(t);b.req++;const fresh=s.val&&t<s.exp;
+    switch(this.strat){
+      case 'naive': return fresh?this.hit(t,b):this.fetch(k,t,t,false);
+      case 'sf': if(fresh)return this.hit(t,b); if(s.fetching){s.fetching.w.push(t);return 'wait';} return this.fetch(k,t,t,true);
+      case 'swr': if(fresh)return this.hit(t,b);
+        if(s.val&&t<s.exp+P.ttl*5){b.stale++;this.rec(t,0.002);if(!s.fetching)this.fetch(k,t,null,true,true);return 'stale';}
+        return this.fetch(k,t,t,false);
+      case 'xf': if(s.val&&(t-s.delta*P.beta*Math.log(Math.random()||1e-12))<s.exp)return this.hit(t,b); return this.fetch(k,t,t,false);
+      case 'lease': if(fresh)return this.hit(t,b);
+        if(!s.fetching&&t-s.leaseAt>=LEASE){s.leaseAt=t;return this.fetch(k,t,t,true);}
+        this.retries.push({k,t0:t,next:t+RETRY});return 'wait';
+    }}
+  step(t){const b=this.bucket(t);
+    if(this.inflight.length){const keep=[];for(const f of this.inflight){
+      if(f.end<=t){const s=this.keys[f.k];if(s&&s.fetching===f)s.fetching=null;
+        if(f.fail){b.err+=f.w.length;this.errFlash=performance.now();}
+        else if(s){s.val=true;s.exp=f.end+P.ttl*(1+P.jitter/100*(2*Math.random()-1));s.delta=f.end-f.start;for(const t0 of f.w)this.rec(t,f.end-t0);}
+      }else keep.push(f);}this.inflight=keep;}
+    if(this.retries.length){const keep=[];for(const r of this.retries){
+      if(r.next>t){keep.push(r);continue;}const s=this.keys[r.k];
+      if(!s){continue;}
+      if(s.val&&t<s.exp){b.hit++;this.rec(t,t-r.t0);}
+      else if(t-r.t0>GIVEUP){b.err++;}
+      else if(!s.fetching&&t-s.leaseAt>=LEASE){s.leaseAt=t;this.fetch(r.k,t,r.t0,true);}
+      else{r.next=t+RETRY;b.retry++;keep.push(r);}
+    }this.retries=keep;}
+    let w=this.retries.length;for(const f of this.inflight)w+=f.w.length;this.waiting=w;
+    if(this.inflight.length>b.inMax)b.inMax=this.inflight.length;if(w>b.waitMax)b.waitMax=w;}
+  flush(){for(const s of this.keys){s.val=false;s.exp=0;s.leaseAt=-1e9;}}
+  spawn(type){if(this.dots.length>260)return;this.dots.push({type,t0:performance.now(),y:0.12+Math.random()*0.76});}
+  metrics(){const now=simT;const bs=this.buckets.slice(-20);const span=Math.max(0.5,Math.min(10,now));
+    let o=0,req=0,st=0,err=0,pk=0,rt=0;for(const b of bs){o+=b.origin;req+=b.req;st+=b.stale;err+=b.err;rt+=b.retry;if(b.inMax>pk)pk=b.inMax;}
+    // prune latencies
+    let i=0;const L=this.lats;while(i<L.length&&L[i]<now-10)i+=2;if(i)L.splice(0,i);
+    const v=[];for(let j=1;j<L.length;j+=2)v.push(L[j]);v.sort((a,b)=>a-b);
+    const p95=v.length?v[Math.min(v.length-1,Math.floor(v.length*0.99))]:0;
+    return {orate:o/span,peak:pk,p95,stale:req?st/req:0,err,retry:rt/span,waiting:this.waiting};}
+}
+
+const A=new Lane($('#laneA'),'naive'), B=new Lane($('#laneB'),'sf');
+const lanes=[A,B];
+
+function fmtMs(s){return s<1?Math.round(s*1000)+' ms':s.toFixed(2)+' s';}
+function renderMetrics(){for(const L of lanes){const m=L.metrics();
+  const cells=[
+    ['Origin calls/s',m.orate.toFixed(1),m.orate>P.cap*2/(P.lat/1000)?'bad':''],
+    ['Peak in-flight',m.peak+' / '+P.cap,m.peak>P.cap*3?'bad':m.peak>P.cap?'warn':'ok'],
+    ['p99 latency (served)',m.p95?fmtMs(m.p95):'—',m.p95>1.5?'bad':m.p95>0.3?'warn':'ok'],
+    ['Errors (10 s)',String(m.err),m.err?'bad':'ok'],
+    ['Stale served',(m.stale*100).toFixed(1)+'%',m.stale>0?'warn':''],
+    [L.strat==='lease'?'Retries/s':'Waiting now',L.strat==='lease'?Math.round(m.retry).toLocaleString():m.waiting.toLocaleString(),'']
+  ];
+  L.mEl.innerHTML=cells.map(c=>'<div class="metric '+c[2]+'"><div class="k">'+c[0]+'</div><div class="v">'+c[1]+'</div></div>').join('');}
+  $('#clock').textContent='t = '+simT.toFixed(1)+' s'+(simT<spikeUntil?' · spike':'')+(paused?' · paused':'');}
+
+let C={};
+function readColors(){const cs=getComputedStyle(document.documentElement);
+  for(const k of ['bg','surface','sunk','ink','muted','line','accent','hit','stale','miss','wait'])C[k]=cs.getPropertyValue('--'+k).trim();}
+readColors();
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readColors);}catch(e){}
+new MutationObserver(readColors).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+function fit(cv){const d=window.devicePixelRatio||1;const w=cv.clientWidth,h=cv.clientHeight;
+  if(cv.width!==Math.round(w*d)||cv.height!==Math.round(h*d)){cv.width=Math.round(w*d);cv.height=Math.round(h*d);}
+  const g=cv.getContext('2d');g.setTransform(d,0,0,d,0,0);return [g,w,h];}
+function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function alpha(hex,a){if(!hex||hex[0]!=='#')return hex;const n=parseInt(hex.slice(1),16);return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';}
+
+function drawLane(L){const [g,w,h]=fit(L.cv);g.clearRect(0,0,w,h);
+  const cx=w*0.08, kx=w*0.36, kw=w*0.26, ox=w*0.78, ow=w*0.17;
+  g.font='500 11px "IBM Plex Mono", monospace';g.fillStyle=C.muted;g.textBaseline='top';
+  g.fillText('clients',4,4);g.fillText('cache',kx,4);g.fillText('origin',ox,4);
+  // clients column
+  for(let i=0;i<7;i++){g.fillStyle=alpha(C.muted,0.35);g.beginPath();g.arc(cx,30+i*(h-50)/6,4,0,Math.PI*2);g.fill();}
+  // cache box
+  const ky=22,kh=h-34;g.fillStyle=C.surface;rr(g,kx,ky,kw,kh,8);g.fill();g.strokeStyle=C.line;g.lineWidth=1;g.stroke();
+  const n=L.keys.length, cols=Math.max(1,Math.ceil(Math.sqrt(n*kw/kh))), rows=Math.ceil(n/cols);
+  const pad=8, cw=(kw-pad*2)/cols, chh=Math.min((kh-pad*2-16)/rows,cw);
+  for(let i=0;i<n;i++){const s=L.keys[i];const x=kx+pad+(i%cols)*cw, y=ky+pad+Math.floor(i/cols)*chh; const cwi=cw-3,chi=chh-3;
+    let fill=C.sunk;
+    if(s.val&&simT<s.exp){const rem=Math.max(0,Math.min(1,(s.exp-simT)/P.ttl));fill=alpha(C.hit,0.25+0.75*rem);}
+    else if(s.val){fill=C.stale;}
+    g.fillStyle=fill;rr(g,x,y,cwi,chi,3);g.fill();
+    if(s.fetching){g.strokeStyle=C.wait;g.lineWidth=2;rr(g,x+1,y+1,cwi-2,chi-2,3);g.stroke();}
+  }
+  g.fillStyle=L.waiting?C.wait:C.muted;g.font='500 11px "IBM Plex Mono", monospace';g.textBaseline='bottom';
+  g.fillText(L.waiting?L.waiting.toLocaleString()+' waiting':'no waiters',kx+pad,ky+kh-5);
+  // origin box
+  const oy=22,oh=h-34;const flash=performance.now()-L.errFlash<350;
+  g.fillStyle=C.surface;rr(g,ox,oy,ow,oh,8);g.fill();g.strokeStyle=flash?C.miss:C.line;g.lineWidth=flash?2.5:1;g.stroke();
+  const inf=L.inflight.length,mx=P.cap*3,frac=Math.min(1,inf/mx);
+  const mxp=ox+ow*0.3,mw=ow*0.4,mtop=oy+18,mh=oh-36;
+  g.fillStyle=C.sunk;g.fillRect(mxp,mtop,mw,mh);
+  g.fillStyle=inf>P.cap*2?C.miss:inf>P.cap?C.stale:C.hit;g.fillRect(mxp,mtop+mh*(1-frac),mw,mh*frac);
+  const capY=mtop+mh*(1-1/3);g.strokeStyle=C.ink;g.setLineDash([3,3]);g.lineWidth=1;g.beginPath();g.moveTo(mxp-6,capY);g.lineTo(mxp+mw+6,capY);g.stroke();g.setLineDash([]);
+  g.fillStyle=C.ink;g.textBaseline='top';g.textAlign='center';g.fillText(String(inf),ox+ow/2,oy+4);
+  g.fillStyle=C.muted;g.textBaseline='bottom';g.fillText('limit '+P.cap,ox+ow/2,oy+oh-4);g.textAlign='left';
+  // dots
+  const now=performance.now();const keep=[];
+  for(const d of L.dots){const age=now-d.t0;const y=22+d.y*(h-40);let x,col,alive=true,a=1;
+    if(d.type==='hit'||d.type==='stale'){const T=700;if(age>T){alive=false;}else{const p=age/T;x=p<0.5?cx+(kx-cx)*(p*2):kx-(kx-cx)*((p-0.5)*2);}col=d.type==='hit'?C.hit:C.stale;}
+    else if(d.type==='wait'){const T=900;if(age>T)alive=false;else{const p=Math.min(1,age/450);x=cx+(kx-6-cx)*p;a=age>450?1-(age-450)/450:1;}col=C.wait;}
+    else if(d.type==='miss'){const T=900;if(age>T)alive=false;else{const p=age/T;x=cx+(ox-cx)*p;}col=C.miss;}
+    else{const T=600;if(age>T)alive=false;else{const p=age/T;x=kx+kw+(ox-kx-kw)*p;}col=C.wait;}
+    if(!alive)continue;keep.push(d);g.globalAlpha=Math.max(0,a);g.fillStyle=col;g.beginPath();g.arc(x,y,3.2,0,Math.PI*2);g.fill();g.globalAlpha=1;}
+  L.dots=keep;}
+
+function drawCharts(){let ymax=P.cap*1.6;for(const L of lanes)for(const b of L.buckets)if(b.inMax>ymax)ymax=b.inMax;ymax=Math.ceil(ymax*1.1);
+  const cur=Math.floor(simT/0.5);
+  for(const L of lanes){const [g,w,h]=fit(L.ch);g.clearRect(0,0,w,h);const left=30,top=6,bot=h-14,pw=w-left-4,ph=bot-top;
+    g.strokeStyle=C.line;g.lineWidth=1;g.beginPath();g.moveTo(left,bot+.5);g.lineTo(w-4,bot+.5);g.stroke();
+    g.fillStyle=C.muted;g.font='10px "IBM Plex Mono", monospace';g.textAlign='right';g.textBaseline='middle';
+    g.fillText(String(ymax),left-4,top+4);g.fillText('0',left-4,bot);
+    g.textAlign='left';g.textBaseline='top';g.fillText('−60 s',left,bot+2);g.textAlign='right';g.fillText('now',w-4,bot+2);g.textAlign='left';
+    const bw=pw/120;
+    for(const b of L.buckets){const age=cur-b.i;if(age<0||age>=120)continue;const x=left+pw-(age+1)*bw;const bh=ph*Math.min(1,b.inMax/ymax);
+      g.fillStyle=b.inMax>P.cap*3?C.miss:b.inMax>P.cap?C.stale:C.accent;g.fillRect(x+0.5,bot-bh,Math.max(1,bw-1),bh);
+      if(b.err){g.fillStyle=C.miss;g.fillRect(x+0.5,top,Math.max(1,bw-1),3);}}
+    const cy=bot-ph*(P.cap/ymax);g.strokeStyle=C.ink;g.setLineDash([4,3]);g.beginPath();g.moveTo(left,cy);g.lineTo(w-4,cy);g.stroke();g.setLineDash([]);
+  }}
+
+function tick(dt){let steps=Math.round(dt/DT);latP=Math.min(1,500/Math.max(1,effRate()));dotP=Math.min(1,22/Math.max(1,effRate()));
+  for(let s=0;s<steps;s++){simT+=DT;const n=poisson(effRate()*DT);
+    for(let i=0;i<n;i++){const k=pickKey();const show=Math.random()<dotP;
+      for(const L of lanes){const r=L.request(simT,k);if(r==='miss'){if(Math.random()<Math.min(1,40/Math.max(1,effRate()*0.05)))L.spawn('miss');}else if(show)L.spawn(r);}}
+    for(const L of lanes)L.step(simT);}}
+
+let last=performance.now(),lastM=0;
+function frame(now){const real=Math.min(0.05,(now-last)/1000);last=now;
+  if(!paused)tick(real*P.speed);
+  for(const L of lanes)drawLane(L);drawCharts();
+  if(now-lastM>250){renderMetrics();lastM=now;}
+  requestAnimationFrame(frame);}
+
+function resetAll(){buildZipf();for(const L of lanes)L.reset();}
+function setStrat(s){P.strat=s;B.strat=s;document.querySelectorAll('#strat button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.s===s)));
+  const n=NOTES[s];$('#bname').textContent=n[0];$('#bsub').textContent=n[1];$('#stratnote').textContent=n[2];resetAll();simT=Math.ceil(simT);}
+
+const fmt={rate:v=>v+' req/s',keys:v=>String(v),ttl:v=>v+' s',jitter:v=>'±'+v+'%',lat:v=>v+' ms',cap:v=>String(v),beta:v=>Number(v).toFixed(1),speed:v=>v+'×'};
+for(const id of Object.keys(fmt)){const el=$('#'+id);const upd=()=>{P[id]=Number(el.value);$('#o-'+id).textContent=fmt[id](el.value);if(id==='keys')resetAll();};
+  el.addEventListener('input',upd);P[id]=Number(el.value);$('#o-'+id).textContent=fmt[id](el.value);}
+document.querySelectorAll('#strat button').forEach(b=>b.addEventListener('click',()=>setStrat(b.dataset.s)));
+$('#flush').addEventListener('click',()=>{for(const L of lanes)L.flush();});
+$('#spike').addEventListener('click',()=>{spikeUntil=simT+10;});
+$('#pause').addEventListener('click',e=>{paused=!paused;e.currentTarget.textContent=paused?'Run':'Pause';renderMetrics();});
+$('#reset').addEventListener('click',()=>{simT=0;spikeUntil=-1;resetAll();});
+
+buildZipf();setStrat('sf');simT=0;
+// warm-start so the first frame already shows a working state
+tick(3);renderMetrics();
+requestAnimationFrame(t=>{last=t;frame(t);});
+window.__lab={A,B,P,tick,setStrat,get t(){return simT;}};
+})();
+</script>
+
+</body></html>

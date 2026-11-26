@@ -1,0 +1,408 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>System Design Lab — Rate Limiting (2026-11-25)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one 1040px column of lab sections; the simulator is a two-pane bench (controls | scope) that stacks on phones. */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --sunk:#e8ecf2; --line:#d3dae4;
+  --fg:#16202e; --muted:#5a6779; --accent:#2346c8; --accent-soft:#dfe6fb;
+  --ok:#1d8a5a; --bad:#c2412b; --warn:#a66b00;
+  --c-fixed:#c2412b; --c-slide:#2346c8; --c-bucket:#0f8a86; --c-offered:#9aa6b6;
+  --f-display:"Sora","Segoe UI",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141c; --surface:#161d28; --sunk:#1d2633; --line:#2b3646;
+  --fg:#e5eaf1; --muted:#97a3b5; --accent:#8ea6ff; --accent-soft:#232f52;
+  --ok:#4cc38a; --bad:#ff8a73; --warn:#e6b450;
+  --c-fixed:#ff8a73; --c-slide:#8ea6ff; --c-bucket:#4fd1c9; --c-offered:#5d6a7c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --surface:#161d28; --sunk:#1d2633; --line:#2b3646;
+  --fg:#e5eaf1; --muted:#97a3b5; --accent:#8ea6ff; --accent-soft:#232f52;
+  --ok:#4cc38a; --bad:#ff8a73; --warn:#e6b450;
+  --c-fixed:#ff8a73; --c-slide:#8ea6ff; --c-bucket:#4fd1c9; --c-offered:#5d6a7c; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:clamp(1.9rem,4.5vw,2.9rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:1.5rem;font-weight:600;letter-spacing:-.01em}
+h3{font-size:1.05rem;font-weight:600}
+p{margin:0;max-width:68ch}
+a{color:var(--accent)}
+code,.mono{font-family:var(--f-mono);font-size:.9em}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+section{display:flex;flex-direction:column;gap:18px}
+header.hero{padding-top:48px;display:flex;flex-direction:column;gap:16px}
+.lede{font-size:1.12rem;color:var(--muted);max-width:62ch}
+.formula{font-family:var(--f-mono);background:var(--sunk);border-radius:6px;padding:12px 14px;overflow-x:auto;font-size:.92rem;white-space:pre}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:6px}
+.fact .n{font-family:var(--f-display);font-size:1.7rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.fact .src{font-size:.78rem;color:var(--muted);font-family:var(--f-mono)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.two>*{min-width:0}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+.tbl{overflow-x:auto}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline}
+/* bench */
+.bench{display:grid;grid-template-columns:290px 1fr;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.bench>*{min-width:0}
+@media (max-width:820px){.bench{grid-template-columns:1fr}}
+.controls{padding:18px;display:flex;flex-direction:column;gap:16px;border-right:1px solid var(--line);background:var(--sunk)}
+@media (max-width:820px){.controls{border-right:0;border-bottom:1px solid var(--line)}}
+.ctl{display:flex;flex-direction:column;gap:6px}
+.ctl label,.ctl .lbl{font-size:.82rem;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.ctl output{font-family:var(--f-mono);font-weight:500;color:var(--accent);font-variant-numeric:tabular-nums}
+.ctl .hint{font-size:.76rem;color:var(--muted);line-height:1.4}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{flex:1;border:0;background:transparent;color:var(--fg);font:500 .78rem var(--f-body);padding:7px 4px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.btns{display:flex;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:600 .85rem var(--f-body);padding:8px 14px;border-radius:6px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.scope{padding:18px;display:flex;flex-direction:column;gap:14px}
+.scope-head{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center}
+.clock{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+canvas{display:block;width:100%;max-width:100%}
+#chart{height:260px}
+#lanes{height:126px}
+.meters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:560px){.meters{grid-template-columns:1fr}}
+.meter{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px;border-top:3px solid var(--col)}
+.meter .name{font-weight:600;font-size:.9rem}
+.meter .row{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted)}
+.meter .row b{font-family:var(--f-mono);color:var(--fg);font-weight:500;font-variant-numeric:tabular-nums}
+.pill{align-self:flex-start;font-family:var(--f-mono);font-size:.7rem;padding:2px 8px;border-radius:99px;letter-spacing:.04em}
+.pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.nodes{display:flex;flex-direction:column;gap:6px}
+.nrow{display:grid;grid-template-columns:118px 1fr;gap:8px;align-items:center;font-size:.76rem}
+.nrow .k{color:var(--muted);font-family:var(--f-mono)}
+.ncells{display:grid;gap:4px}
+.ncell{height:22px;background:var(--sunk);border-radius:3px;position:relative;overflow:hidden}
+.ncell i{position:absolute;left:0;top:0;bottom:0;background:var(--col);opacity:.75}
+.ncell em{position:absolute;inset:0;font-style:normal;font-family:var(--f-mono);font-size:.66rem;display:flex;align-items:center;justify-content:center;color:var(--fg)}
+.callout{background:var(--accent-soft);border-radius:8px;padding:14px 16px;font-size:.93rem}
+.callout p{max-width:none}
+/* solve */
+.scenario{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:22px;display:flex;flex-direction:column;gap:14px}
+.scenario ul,.answer ul,.answer ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+details{border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+details>summary{cursor:pointer;padding:12px 16px;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"+";font-family:var(--f-mono);color:var(--muted)}
+details[open]>summary::after{content:"−"}
+details>div{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px}
+pre.code{font-family:var(--f-mono);font-size:.82rem;background:var(--sunk);padding:12px;border-radius:6px;overflow-x:auto;margin:0;line-height:1.5}
+.stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.stack div{border-left:2px solid var(--line);padding-left:14px;display:flex;flex-direction:column;gap:4px;font-size:.92rem}
+.stack b{font-family:var(--f-mono);font-size:.8rem;color:var(--accent);font-weight:500}
+ol.sources{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:.92rem}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+<header class="hero">
+  <span class="eyebrow">System Design Lab · 25 Nov 2026 · Rate limiting</span>
+  <h1>Counting requests across a fleet without letting 2× the limit through</h1>
+  <p class="lede">Cloudflare had to enforce per-IP limits for millions of domains from every edge server at once. Stripe had to stop one customer's script from degrading the API for everyone. Both ended up with approximate, cheap counters in a shared store, and both chose them over exact ones on purpose.</p>
+</header>
+
+<section>
+  <span class="eyebrow">The problem at scale</span>
+  <h2>What forced the design</h2>
+  <div class="facts">
+    <div class="fact"><span class="n">400k rps</span><span>largest attack mitigated against a single domain by Cloudflare's rate limiter, which processes several billion requests a day</span><span class="src">Cloudflare, 2017</span></div>
+    <div class="fact"><span class="n">0.003%</span><span>of 400M requests from 270k sources wrongly allowed or limited by the sliding-window approximation; average error vs. true rate 6%</span><span class="src">Cloudflare, 2017</span></div>
+    <div class="fact"><span class="n">Millions</span><span>of requests rejected in one month by Stripe's request-rate limiter, vs ~12,000 by the concurrency limiter and ~100 by the worker load shedder</span><span class="src">Stripe, 2017</span></div>
+    <div class="fact"><span class="n">20%</span><span>of fleet capacity Stripe's load shedder can reserve for critical calls such as creating charges; non-critical traffic past 80% gets a 503</span><span class="src">Stripe, 2017</span></div>
+  </div>
+  <div class="two">
+    <p><b>Cloudflare.</b> Edge nodes run NGINX in each PoP. A central counter store was ruled out for latency and availability, so each PoP keeps counters in a memcache (Twemcache) cluster behind Twemproxy, which spreads keys with consistent hashing. The store only had <code>GET</code>, <code>SET</code> and atomic <code>INCR</code>. CAS was rejected because under attack contention most CAS transactions would fail. Increments are asynchronous, and once a client is over the limit a mitigation flag with a known expiry is cached in memory on every server, so blocked traffic stops touching the store.</p>
+    <p><b>Stripe.</b> A layered set of four limiters on Redis: a per-user <b>token bucket</b> request-rate limiter that allows short bursts, a <b>concurrent-requests</b> limiter (e.g. 20 in flight) for expensive endpoints, and two <b>load shedders</b> keyed on traffic class rather than user. They dark-launched each limiter to see what it would block, put them behind feature flags, and made them <b>fail open</b>, so a Redis failure never takes the API down.</p>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">The concept</span>
+  <h2>Three counters, three failure modes</h2>
+  <p>A rate limiter answers one question per request: has this key used more than <i>L</i> units in the last <i>W</i> seconds? The exact answer needs a log of every timestamp (O(L) memory per key). Production systems approximate it.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Algorithm</th><th>State per key</th><th>Behaviour</th><th>Failure mode</th></tr></thead>
+    <tbody>
+      <tr><td><span class="sw" style="background:var(--c-fixed)"></span>Fixed window</td><td>1 counter</td><td>Reset to 0 at each window boundary</td><td>Boundary burst: <i>L</i> at 0:59 plus <i>L</i> at 1:00 lets 2<i>L</i> through in two seconds</td></tr>
+      <tr><td><span class="sw" style="background:var(--c-slide)"></span>Sliding window counter</td><td>2 counters</td><td>Weights the previous window by how much of it still overlaps</td><td>Assumes the previous window's traffic was uniform; small over/undershoot (Cloudflare measured 6% average error)</td></tr>
+      <tr><td><span class="sw" style="background:var(--c-bucket)"></span>Token bucket</td><td>tokens + last refill time</td><td>Refills at <i>L/W</i> per second up to capacity <i>B</i>; each request spends one</td><td>By design admits a burst of <i>B</i> on top of the sustained rate; read-modify-write must be atomic</td></tr>
+    </tbody>
+  </table></div>
+  <div class="formula">rate ≈ prev_count × (W − elapsed) / W + curr_count
+Cloudflare's example: limit 50/min, 15 s into the minute, prev = 42, curr = 18
+rate = 42 × 45/60 + 18 = 49.5  → the next request trips the limit</div>
+  <p><b>The distributed part is the hard part.</b> Every algorithm above is trivial in one process. Across N stateless tasks behind a load balancer you either share state (Redis or memcache round trip per request, plus a decision about what happens when it is down) or keep it local. Local counters with the full limit admit up to N×L. Local counters with L/N are only right if the balancer spreads one key evenly, which a single hot client never gets.</p>
+</section>
+
+<section aria-labelledby="sim-h">
+  <span class="eyebrow">Simulation</span>
+  <h2 id="sim-h">Run all three side by side</h2>
+  <p>The same request stream hits all three limiters. The chart plots the <b>true number of accepted requests in the trailing 60 seconds</b>, which is what your downstream actually feels. Choose <b>Window-edge attack</b> to watch the fixed window double the limit, then add nodes with per-node state to watch every algorithm leak.</p>
+  <div class="bench">
+    <div class="controls">
+      <div class="ctl"><span class="lbl">Traffic pattern</span>
+        <div class="seg" id="pattern">
+          <button type="button" data-v="steady" aria-pressed="false">Steady</button>
+          <button type="button" data-v="flash" aria-pressed="false">Flash sale</button>
+          <button type="button" data-v="edge" aria-pressed="true">Window edge</button>
+        </div>
+        <span class="hint" id="patHint"></span>
+      </div>
+      <div class="ctl"><label for="rate">Offered rate <output id="rateO"></output></label><input type="range" id="rate" min="1" max="40" step="1" value="6"></div>
+      <div class="ctl"><label for="limit">Limit L per 60 s <output id="limitO"></output></label><input type="range" id="limit" min="120" max="1200" step="60" value="600"></div>
+      <div class="ctl"><label for="burst">Bucket capacity B <output id="burstO"></output></label><input type="range" id="burst" min="5" max="100" step="5" value="25"><span class="hint">Token bucket only. Refill is always L/60 per second.</span></div>
+      <div class="ctl"><label for="nodes">App nodes <output id="nodesO"></output></label><input type="range" id="nodes" min="1" max="8" step="1" value="1"></div>
+      <div class="ctl"><span class="lbl">Limiter state</span>
+        <div class="seg" id="mode">
+          <button type="button" data-v="shared" aria-pressed="true">Shared store</button>
+          <button type="button" data-v="local" aria-pressed="false">Per node, L</button>
+          <button type="button" data-v="split" aria-pressed="false">Per node, L/N</button>
+        </div>
+        <span class="hint" id="modeHint"></span>
+      </div>
+      <div class="ctl"><label for="speed">Sim speed <output id="speedO"></output></label><input type="range" id="speed" min="5" max="60" step="5" value="20"></div>
+      <div class="btns"><button type="button" class="btn primary" id="play">Pause</button><button type="button" class="btn" id="reset">Reset</button></div>
+    </div>
+    <div class="scope">
+      <div class="scope-head">
+        <div class="legend">
+          <span><i class="sw" style="background:var(--c-offered)"></i>Offered</span>
+          <span><i class="sw" style="background:var(--c-fixed)"></i>Fixed window</span>
+          <span><i class="sw" style="background:var(--c-slide)"></i>Sliding counter</span>
+          <span><i class="sw" style="background:var(--c-bucket)"></i>Token bucket</span>
+        </div>
+        <span class="clock" id="clock">t = 0 s</span>
+      </div>
+      <canvas id="chart" aria-label="Trailing 60-second accepted requests per algorithm versus the limit" role="img"></canvas>
+      <canvas id="lanes" aria-label="Recent requests per algorithm, green accepted, red rejected" role="img"></canvas>
+      <div class="meters" id="meters"></div>
+      <div class="nodes" id="nodeView"></div>
+    </div>
+  </div>
+  <div class="callout"><p><b>What to look for.</b> On Window edge with one node, the fixed window's peak goes to about 2.0×L while the sliding counter stays near 1.0–1.1× and the token bucket admits only its burst B plus the L/60 refill during the attack. Under sustained overload the bucket's trailing count tops out near L+B. Switch to <i>Per node, L</i> with 4 nodes and every line climbs toward 4×L. <i>Per node, L/N</i> roughly holds the line for random routing but under-admits when nodes see uneven load, which is why Cloudflare and Stripe pay for the shared store.</p></div>
+</section>
+
+<section>
+  <span class="eyebrow">Solve it</span>
+  <h2>Supplier quotas for availability fan-out</h2>
+  <div class="scenario">
+    <p>Your meta-search API fans every hotel search out to supplier APIs. Supplier <b>X</b> contractually allows <b>50 requests/second across your whole account</b> and suspends your key for an hour after repeated 429s. Search runs as a Node service on Fargate that autoscales from 4 to 24 tasks. The same supplier also serves <b>prebook and book</b> calls, which carry revenue. Last Friday a promo email caused a search spike: tasks scaled out, each task's in-process limiter allowed 50 rps, and the supplier suspended you mid-evening, failing bookings too.</p>
+    <h3>Design question</h3>
+    <ul>
+      <li>Where does the limit state live, and what algorithm do you use?</li>
+      <li>How do you guarantee booking traffic still gets through when search saturates the quota?</li>
+      <li>What does a search request do when it can't get a token, and what happens if Redis is unreachable?</li>
+    </ul>
+  </div>
+  <details><summary>Hint 1: count the right thing</summary><div><p>The limit belongs to the supplier, not to your users. Key the limiter on <code>supplier_id</code> (and credential), not on caller IP, and enforce it on the <b>outbound</b> path. Per-task limits are the "Per node, L" mode from the simulator: N tasks, N×L.</p></div></details>
+  <details><summary>Hint 2: Stripe's load shedder</summary><div><p>Stripe reserves a slice of capacity for critical methods. Apply the same idea per supplier: two classes of traffic, one quota.</p></div></details>
+  <details><summary>Hint 3: failing open is not always right</summary><div><p>Stripe fails open because blocking its own customers is worse than briefly overrunning its own capacity. Here, overrunning means a supplier ban. Which way should <i>this</i> limiter fail?</p></div></details>
+  <details><summary>Model answer</summary><div class="answer">
+    <ol>
+      <li><b>Shared token bucket in ElastiCache Redis</b>, key <code>rl:supplier:X</code>, rate 50/s, capacity ~50 (one second of burst, matching how suppliers usually meter). Read-refill-spend runs as one Lua script so it is atomic across 24 tasks. Leave headroom: target 45/s, since the supplier's clock and window are not yours.</li>
+      <li><b>Reserve booking capacity.</b> Two buckets that share the quota: search may only spend down to a floor (e.g. it gets 40/s), prebook/book draw from the full 50. Equivalent: one bucket, and search requests are rejected when tokens &lt; reserve.</li>
+      <li><b>Cut Redis round trips with leases.</b> Each task takes tokens in small batches (e.g. 5 at a time) and spends them locally. Lease size bounds the overshoot to roughly tasks × lease, so keep it small.</li>
+      <li><b>No token, no supplier call.</b> Serve that supplier's result from the price/availability cache with a stale flag, or omit it from the result set. Do not queue search work: the user has left by the time it runs. Booking calls may wait briefly (bounded, e.g. 300 ms) for a token.</li>
+      <li><b>Fail closed to a conservative local limit.</b> If Redis is unreachable, each task falls back to <code>floor(45 / expected_max_tasks)</code> rps from an in-process bucket, the "Per node, L/N" mode: it under-admits, but it cannot get you banned. Alert on it.</li>
+      <li><b>Respect the supplier's signal.</b> On a 429 or <code>Retry-After</code>, write a cooldown flag to Redis with that TTL so every task backs off at once, the same trick Cloudflare uses with its cached mitigation flag.</li>
+      <li><b>Dark launch it</b>: log would-be rejections per supplier for a week before enforcing, then turn on per supplier behind a flag.</li>
+    </ol>
+    <pre class="code">-- KEYS[1]=bucket  ARGV: rate/s, capacity, now_ms, want, floor
+local b = redis.call('HMGET', KEYS[1], 't', 'ts')
+local rate, cap, now, want, floor = tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3]), tonumber(ARGV[4]), tonumber(ARGV[5])
+local t  = tonumber(b[1]) or cap
+local ts = tonumber(b[2]) or now
+t = math.min(cap, t + (now - ts) / 1000 * rate)
+local granted = 0
+if t - want >= floor then t = t - want; granted = want end
+redis.call('HSET', KEYS[1], 't', t, 'ts', now)
+redis.call('PEXPIRE', KEYS[1], math.ceil(cap / rate * 1000) * 2)
+return granted   -- search: floor = reserve; booking: floor = 0</pre>
+    <p class="hint" style="font-size:.85rem;color:var(--muted)">Use Redis server time (<code>TIME</code>) rather than each task's clock if Fargate task clocks may drift; passing <code>now</code> in keeps the example short.</p>
+  </div></details>
+</section>
+
+<section>
+  <span class="eyebrow">Apply to your stack</span>
+  <h2>Where this lands in Laravel, Node, MongoDB, Kafka and AWS</h2>
+  <div class="stack">
+    <div><b>Laravel</b><span><code>RateLimiter::for()</code> plus the <code>throttle</code> middleware keep a hit counter with a decay timer in your cache store, which behaves like a fixed window. That's fine for login and OTP abuse. For partner-facing API quotas, use the Redis store and a Lua token bucket like the one above, or <code>Redis::throttle()</code> inside queued jobs that call suppliers.</span></div>
+    <div><b>Node</b><span>Put the outbound limiter in the HTTP client wrapper for each supplier, not in route middleware. Batch token leases per task so a search fan-out of 30 suppliers doesn't cost 30 Redis round trips.</span></div>
+    <div><b>MongoDB</b><span>Keep hot counters out of it. A per-request <code>$inc</code> on one document is a single-document write hotspot. Mongo is the right place for the limit <i>configuration</i> per partner and supplier, loaded into Redis or memory.</span></div>
+    <div><b>Kafka</b><span>Rate-limit consumers, not producers. A consumer that pushes webhooks to a partner can <code>pause()</code> its partitions when that partner's bucket is empty and <code>resume()</code> later. Lag grows instead of 429s, and lag is something you already alert on.</span></div>
+    <div><b>AWS</b><span>API Gateway throttling is itself a token bucket (steady rate plus burst) and returns <code>429</code>. AWS documents it as best-effort, a target rather than a guaranteed ceiling, so keep your own limiter for contractual limits. WAF rate-based rules work at the edge per IP, the Cloudflare-style first line.</span></div>
+    <div><b>Fargate</b><span>Autoscaling changes N under you. Any per-task limit has to be derived from max task count, or it silently grows the effective limit on every scale-out.</span></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Sources</span>
+  <h2>Read the originals</h2>
+  <ol class="sources">
+    <li><a href="https://blog.cloudflare.com/counting-things-a-lot-of-different-things/" target="_blank" rel="noopener">Cloudflare: How we built rate limiting capable of scaling to millions of domains</a></li>
+    <li><a href="https://stripe.com/blog/rate-limiters" target="_blank" rel="noopener">Stripe: Scaling your API with rate limiters</a></li>
+    <li><a href="https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html" target="_blank" rel="noopener">AWS: Throttle requests to your REST APIs for better throughput in API Gateway</a></li>
+  </ol>
+</section>
+</div>
+
+<script>
+(()=>{
+const W=60, DT=0.25, HIST=300;
+const $=id=>document.getElementById(id);
+const ALG=[{k:'fixed',name:'Fixed window',col:'--c-fixed'},{k:'sliding',name:'Sliding counter',col:'--c-slide'},{k:'bucket',name:'Token bucket',col:'--c-bucket'}];
+const P={pattern:'edge',rate:6,limit:600,burst:25,nodes:1,mode:'shared',speed:20,running:true};
+const PAT_HINT={steady:'Constant Poisson arrivals at the offered rate.',flash:'Offered rate ×5 for 12 s every 90 s.',edge:'Attacker sends 2.4×L over 16 s straddling every other window boundary; slider sets background noise.'};
+const MODE_HINT={shared:'One counter per key in Redis or memcache; every node sees the same state.',local:'Each node enforces the full L in memory. Effective limit up to N×L.',split:'Each node enforces L/N. Requests are routed to a random node.'};
+let sim;
+function rateAt(t){
+  const r=P.rate;
+  if(P.pattern==='flash') return (t%90)<12? r*5 : r;
+  if(P.pattern==='edge'){const ph=t%120; return (ph>=52&&ph<68)? (2.4*P.limit)/16 : Math.min(r,P.limit/W*0.3);}
+  return r;
+}
+function poisson(l){if(l>30){return Math.max(0,Math.round(l+Math.sqrt(l)*gauss()))}const L=Math.exp(-l);let k=0,p=1;do{k++;p*=Math.random()}while(p>L);return k-1}
+function gauss(){return Math.sqrt(-2*Math.log(1-Math.random()))*Math.cos(2*Math.PI*Math.random())}
+function newState(){return {w:-1,c:0,prev:0,tok:null,last:0}}
+function makeSim(){
+  const n=P.mode==='shared'?1:P.nodes;
+  const div=P.mode==='split'?P.nodes:1;
+  const lim=P.limit/div, cap=Math.max(1,P.limit*P.burst/100/div), refill=P.limit/W/div;
+  return {t:0,n,lim,cap,refill,
+    alg:ALG.map(a=>({...a,states:Array.from({length:n},newState),acc:[],ai:0,ok:0,rej:0,peak:0,series:[],events:[]})),
+    off:[],oi:0,offSeries:[],lastSample:0};
+}
+function decide(a,t,node){
+  const s=a.states[P.mode==='shared'?0:node], lim=sim.lim;
+  if(a.k==='fixed'){const w=Math.floor(t/W); if(s.w!==w){s.w=w;s.c=0} if(s.c<lim){s.c++;return true} return false}
+  if(a.k==='sliding'){const w=Math.floor(t/W); if(s.w!==w){s.prev=(w===s.w+1)?s.c:0; s.w=w; s.c=0}
+    const el=t-w*W, est=s.prev*(W-el)/W+s.c; if(est+1<=lim){s.c++;return true} return false}
+  if(s.tok===null){s.tok=sim.cap;s.last=t}
+  s.tok=Math.min(sim.cap,s.tok+(t-s.last)*sim.refill); s.last=t;
+  if(s.tok>=1){s.tok-=1;return true} return false;
+}
+function trailing(arr,idx,t){while(idx<arr.length&&arr[idx]<=t-W)idx++;return idx}
+function step(){
+  const t0=sim.t, n=poisson(rateAt(t0)*DT), ts=[];
+  for(let i=0;i<n;i++)ts.push(t0+Math.random()*DT);
+  ts.sort((a,b)=>a-b);
+  for(const t of ts){
+    const node=Math.floor(Math.random()*P.nodes);
+    sim.off.push(t);
+    for(const a of sim.alg){const ok=decide(a,t,node); if(ok){a.ok++;a.acc.push(t)}else a.rej++; a.events.push([t,ok,node]);}
+  }
+  sim.t=t0+DT;
+  const t=sim.t;
+  for(const a of sim.alg){
+    a.ai=trailing(a.acc,a.ai,t); if(a.ai>5000){a.acc=a.acc.slice(a.ai);a.ai=0}
+    const ev=a.events; let k=0; while(k<ev.length&&ev[k][0]<t-20)k++; if(k)ev.splice(0,k);
+  }
+  sim.oi=trailing(sim.off,sim.oi,t); if(sim.oi>5000){sim.off=sim.off.slice(sim.oi);sim.oi=0}
+  if(t-sim.lastSample>=1-1e-9){
+    sim.lastSample=t;
+    sim.offSeries.push(sim.off.length-sim.oi); if(sim.offSeries.length>HIST)sim.offSeries.shift();
+    for(const a of sim.alg){const v=a.acc.length-a.ai; a.series.push(v); if(a.series.length>HIST)a.series.shift(); if(t>=W) a.peak=Math.max(a.peak,v);}
+  }
+}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function fit(c){const r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;const w=Math.round(r.width*d),h=Math.round(r.height*d);if(c.width!==w||c.height!==h){c.width=w;c.height=h}const x=c.getContext('2d');x.setTransform(d,0,0,d,0,0);return [x,r.width,r.height]}
+function drawChart(){
+  const [x,w,h]=fit($('chart'));x.clearRect(0,0,w,h);
+  const fg=css('--muted'),line=css('--line'),L=P.limit;
+  const padL=44,padR=10,padT=10,padB=22,pw=w-padL-padR,ph=h-padT-padB;
+  let mx=L*2.2; for(const a of sim.alg)for(const v of a.series)mx=Math.max(mx,v*1.05);
+  for(const v of sim.offSeries)mx=Math.max(mx,Math.min(v,L*4.5)*1.05);
+  const y=v=>padT+ph-(Math.min(v,mx)/mx)*ph, X=i=>padL+(i/(HIST-1))*pw;
+  x.font='11px "IBM Plex Mono", monospace';x.fillStyle=fg;x.strokeStyle=line;x.lineWidth=1;x.textAlign='right';x.textBaseline='middle';
+  const stepL=mx>L*4?L:L/2;
+  for(let v=0;v<=mx;v+=stepL){x.beginPath();x.moveTo(padL,y(v));x.lineTo(w-padR,y(v));x.stroke();x.fillText((v/L).toFixed(1)+'×L',padL-6,y(v))}
+  x.textAlign='center';x.textBaseline='top';
+  const tNow=sim.t;
+  for(let s=0;s<=HIST;s+=60){const i=HIST-1-s;if(i<0)break;x.fillText('−'+s+'s',X(i),h-padB+6)}
+  x.strokeStyle=css('--fg');x.setLineDash([5,4]);x.lineWidth=1.2;x.beginPath();x.moveTo(padL,y(L));x.lineTo(w-padR,y(L));x.stroke();x.setLineDash([]);
+  x.fillStyle=css('--fg');x.textAlign='left';x.textBaseline='bottom';x.fillText('limit L',padL+4,y(L)-2);
+  const plot=(arr,col,wd,fill)=>{if(arr.length<2)return;const off=HIST-arr.length;x.beginPath();arr.forEach((v,i)=>{const px=X(i+off),py=y(v);i?x.lineTo(px,py):x.moveTo(px,py)});
+    if(fill){x.lineTo(X(HIST-1),y(0));x.lineTo(X(off),y(0));x.closePath();x.globalAlpha=.18;x.fillStyle=col;x.fill();x.globalAlpha=1}else{x.strokeStyle=col;x.lineWidth=wd;x.stroke();
+    const lv=arr[arr.length-1];x.beginPath();x.arc(X(HIST-1),y(lv),3,0,7);x.fillStyle=col;x.fill()}};
+  plot(sim.offSeries,css('--c-offered'),1,true);
+  for(const a of sim.alg)plot(a.series,css(a.col),2,false);
+  $('clock').textContent='t = '+Math.floor(tNow)+' s · window '+Math.floor(tNow/W)+' · +'+(tNow%W).toFixed(0)+' s';
+}
+function drawLanes(){
+  const [x,w,h]=fit($('lanes'));x.clearRect(0,0,w,h);
+  const padL=112,rowH=h/3,t=sim.t,ok=css('--ok'),bad=css('--bad');
+  x.font='12px "IBM Plex Sans", sans-serif';x.textBaseline='middle';
+  sim.alg.forEach((a,r)=>{const cy=r*rowH+rowH/2;x.fillStyle=css('--sunk');x.fillRect(padL,r*rowH+4,w-padL,rowH-8);
+    x.fillStyle=css(a.col);x.fillRect(0,cy-5,10,10);x.fillStyle=css('--fg');x.textAlign='left';x.fillText(a.name,16,cy);
+    const ev=a.events,stride=Math.max(1,Math.ceil(ev.length/700));
+    for(let i=0;i<ev.length;i+=stride){const [et,o,nd]=ev[i];const px=padL+(1-(t-et)/20)*(w-padL);const jit=((nd*37+i*13)%((rowH-14)|0||1));
+      x.fillStyle=o?ok:bad;x.globalAlpha=o?.85:.95;x.fillRect(px-1.5,r*rowH+7+jit,3,3)}x.globalAlpha=1;});
+  x.fillStyle=css('--muted');x.font='10px "IBM Plex Mono", monospace';x.textAlign='right';x.textBaseline='bottom';x.fillText('last 20 s → now',w-4,h-1);
+}
+function renderMeters(){
+  $('meters').innerHTML=sim.alg.map(a=>{const tot=a.ok+a.rej,pk=a.peak/P.limit,over=pk>1.2,slight=pk>1.05&&!over;
+    return `<div class="meter" style="--col:var(${a.col})"><span class="name">${a.name}</span>
+    <div class="row"><span>Accepted</span><b>${a.ok.toLocaleString()} / ${tot.toLocaleString()}</b></div>
+    <div class="row"><span>Rejected</span><b>${tot?(a.rej/tot*100).toFixed(1):'0.0'}%</b></div>
+    <div class="row"><span>Peak trailing 60 s</span><b>${sim.t<W?'warming up':pk.toFixed(2)+'×L'}</b></div>
+    <span class="pill ${sim.t<W?'ok':over?'bad':slight?'warn':'ok'}">${sim.t<W?'collecting':over?'over limit':slight?'slight overshoot':'within limit'}</span></div>`}).join('');
+  const lim=sim.lim, label=P.mode==='shared'?'shared store':'node ';
+  $('nodeView').innerHTML=sim.alg.map(a=>{
+    const cells=a.states.map((s,i)=>{let v,frac,txt;const t=sim.t;
+      if(a.k==='fixed'){v=s.w===Math.floor(t/W)?s.c:0;frac=v/lim;txt=Math.round(v)+'/'+Math.round(lim)}
+      else if(a.k==='sliding'){const w=Math.floor(t/W);const prev=s.w===w?s.prev:(s.w===w-1?s.c:0);const cur=s.w===w?s.c:0;v=prev*(W-(t-w*W))/W+cur;frac=v/lim;txt=v.toFixed(0)+'/'+Math.round(lim)}
+      else{const tk=s.tok===null?sim.cap:Math.min(sim.cap,s.tok+(t-s.last)*sim.refill);frac=tk/sim.cap;txt=tk.toFixed(0)+' tok'}
+      return `<div class="ncell" title="${P.mode==='shared'?'Shared store':'Node '+(i+1)}"><i style="width:${Math.min(100,frac*100)}%"></i><em>${txt}</em></div>`}).join('');
+    return `<div class="nrow" style="--col:var(${a.col})"><span class="k">${a.k==='fixed'?'fixed':a.k==='sliding'?'sliding':'bucket'} · ${P.mode==='shared'?'shared':a.states.length+'×'}</span><div class="ncells" style="grid-template-columns:repeat(${a.states.length},1fr)">${cells}</div></div>`}).join('');
+}
+function syncLabels(){
+  $('rateO').textContent=P.rate+' rps';$('limitO').textContent=P.limit+' ('+(P.limit/W).toFixed(0)+' rps)';
+  $('burstO').textContent=Math.round(P.limit*P.burst/100)+' ('+P.burst+'% of L)';$('nodesO').textContent=P.nodes;$('speedO').textContent=P.speed+'×';
+  $('patHint').textContent=PAT_HINT[P.pattern];$('modeHint').textContent=MODE_HINT[P.mode];
+}
+function reset(){sim=makeSim();syncLabels();renderMeters();drawChart();drawLanes()}
+function seg(id,key,resetOn){$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;P[key]=b.dataset.v;
+  [...$(id).children].forEach(c=>c.setAttribute('aria-pressed',c===b?'true':'false'));syncLabels();if(resetOn)reset()})}
+seg('pattern','pattern',true);seg('mode','mode',true);
+[['rate',false],['limit',true],['burst',true],['nodes',true],['speed',false]].forEach(([id,r])=>$(id).addEventListener('input',e=>{P[id]=+e.target.value;syncLabels();if(r)reset()}));
+$('play').addEventListener('click',()=>{P.running=!P.running;$('play').textContent=P.running?'Pause':'Play'});
+$('reset').addEventListener('click',reset);
+reset();
+// pre-run so the first frame already shows a full boundary attack
+for(let i=0;i<Math.round(150/DT);i++)step();
+let acc=0,last=performance.now(),uiT=0;
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame(now){
+  const dt=Math.min(.1,(now-last)/1000);last=now;
+  if(P.running){acc+=dt*P.speed*(reduce?.5:1);let g=0;while(acc>=DT&&g<400){step();acc-=DT;g++}}
+  drawChart();drawLanes();uiT+=dt;if(uiT>.2){renderMeters();uiT=0}
+  requestAnimationFrame(frame);
+}
+renderMeters();requestAnimationFrame(frame);
+window.__sim=()=>sim;
+})();
+</script>
+
+</body></html>

@@ -1,0 +1,104 @@
+/*
+  System Design Lab: site shell.
+  Palette is "drafting table": cool paper, navy ink, one blue signal for structure
+  and one amber spark reserved for things that move (requests, remapped keys, CTAs).
+*/
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --sunk: #e9edf3;
+  --ink: #14233b;
+  --muted: #5b6679;
+  --line: #d6dde7;
+  --signal: #2f57d0;
+  --signal-soft: #e1e8fb;
+  --spark: #c9761a;
+  --spark-fill: #e8952a;
+  --ok: #1f8a5b;
+  --bad: #c0392b;
+
+  --f-display: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --wrap: 1160px;
+  --gutter: clamp(16px, 4vw, 40px);
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 18px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1726; --surface: #152033; --sunk: #1b283e; --ink: #e6ecf5; --muted: #9aa7bc;
+    --line: #2a3a55; --signal: #7c9cff; --signal-soft: #1f2d4f; --spark: #f2a93b; --spark-fill: #f2a93b;
+    --ok: #4cc38a; --bad: #ff8a73; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1726; --surface: #152033; --sunk: #1b283e; --ink: #e6ecf5; --muted: #9aa7bc;
+  --line: #2a3a55; --signal: #7c9cff; --signal-soft: #1f2d4f; --spark: #f2a93b; --spark-fill: #f2a93b;
+  --ok: #4cc38a; --bad: #ff8a73; color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+img, svg { max-width: 100%; }
+a { color: var(--signal); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 4px; }
+code { font-family: var(--f-mono); font-size: .88em; background: var(--sunk); padding: .1em .35em; border-radius: 4px; }
+pre { font-family: var(--f-mono); font-size: .85rem; background: var(--sunk); padding: 14px 16px; border-radius: var(--r-md); overflow-x: auto; line-height: 1.55; }
+pre code { background: none; padding: 0; }
+
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.08; margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
+h1 { font-size: clamp(2.4rem, 6.2vw, 4.6rem); font-weight: 800; letter-spacing: -0.035em; }
+h2 { font-size: clamp(1.6rem, 3vw, 2.25rem); font-weight: 700; }
+h3 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.01em; }
+p { margin: 0; }
+
+.wrap { max-width: var(--wrap); margin: 0 auto; padding-inline: var(--gutter); }
+.measure { max-width: 64ch; }
+.muted { color: var(--muted); }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: 600 .98rem/1 var(--f-body);
+  padding: 13px 20px; border-radius: 999px;
+  border: 1.5px solid var(--ink); background: transparent; color: var(--ink);
+  text-decoration: none; cursor: pointer;
+  transition: background-color .15s, color .15s, border-color .15s;
+}
+.btn:hover { background: var(--ink); color: var(--bg); text-decoration: none; }
+.btn-primary { background: var(--ink); color: var(--bg); }
+.btn-primary:hover { background: var(--signal); border-color: var(--signal); color: #fff; }
+.btn-small { padding: 9px 14px; font-size: .88rem; }
+.btn[disabled] { opacity: .55; cursor: default; }
+
+/* Topic tag: a small coloured dot plus text, not a pill soup */
+.topic { display: inline-flex; align-items: center; gap: 7px; font-size: .86rem; font-weight: 500; color: var(--muted); }
+.topic::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--signal)); }
+
+/* Prose (articles) */
+.prose { max-width: 68ch; font-size: 1.06rem; }
+.prose > * + * { margin-top: 1.05em; }
+.prose h2 { margin-top: 2em; font-size: 1.6rem; }
+.prose h3 { margin-top: 1.6em; }
+.prose ul, .prose ol { padding-left: 1.3em; }
+.prose li + li { margin-top: .35em; }
+.prose blockquote { margin: 1.4em 0; padding: 4px 0 4px 18px; border-left: 3px solid var(--spark-fill); color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
