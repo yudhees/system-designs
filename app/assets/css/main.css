@@ -108,26 +108,19 @@ p { margin: 0; }
 .prose th { font-weight: 600; color: var(--ink); }
 
 /* ---- Motion ---------------------------------------------------------------
-   Only opacity and transform move, so nothing shifts layout. All of it is off
-   under prefers-reduced-motion (see the block above). */
-.rv { opacity: 0; transform: translateY(18px); transition: opacity .6s ease var(--d, 0ms), transform .7s cubic-bezier(.2, .7, .2, 1) var(--d, 0ms); }
+   Kept deliberately small: short fades, an 8px rise on scroll-in and a 2px hover lift.
+   Only opacity and transform move, so nothing shifts layout. Off for reduced motion. */
+.rv { opacity: 0; transform: translateY(8px); transition: opacity .45s ease var(--d, 0ms), transform .45s ease var(--d, 0ms); }
 .rv.rv-in { opacity: 1; transform: none; }
 
-@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-.hero .copy > * { animation: rise .7s cubic-bezier(.2, .7, .2, 1) both; }
-.hero .copy > :nth-child(2) { animation-delay: .08s; }
-.hero .copy > :nth-child(3) { animation-delay: .16s; }
-.hero .copy > :nth-child(4) { animation-delay: .24s; }
-.hero > :last-child { animation: rise .9s cubic-bezier(.2, .7, .2, 1) .15s both; }
+.hero .copy, .hero > :last-child { animation: fade .5s ease both; }
+.hero > :last-child { animation-delay: .1s; }
 
-.page-enter-active { transition: opacity .28s ease, transform .28s ease; }
-.page-leave-active { transition: opacity .14s ease; }
-.page-enter-from { opacity: 0; transform: translateY(8px); }
-.page-leave-to { opacity: 0; }
+.page-enter-active { transition: opacity .2s ease; }
+.page-leave-active { transition: opacity .1s ease; }
+.page-enter-from, .page-leave-to { opacity: 0; }
 
-.btn, .today-card, article.lab, .art, .feature, .pg, .card { transition: transform .2s cubic-bezier(.2, .7, .2, 1), box-shadow .2s, border-color .15s, background-color .15s, color .15s; }
-.btn:hover, .art:hover, .feature:hover, .pg:hover { transform: translateY(-2px); }
-.btn:active { transform: translateY(0) scale(.98); }
-article.lab:hover { transform: translateY(-2px); box-shadow: 0 10px 28px -14px rgb(20 20 40 / .35); }
-.art:hover, .feature:hover, .pg:hover { box-shadow: 0 10px 28px -14px rgb(20 20 40 / .35); }
+.btn, .today-card, article.lab, .art, .feature, .pg, .card { transition: transform .18s ease, box-shadow .18s, border-color .15s, background-color .15s, color .15s; }
+.btn:hover, article.lab:hover, .art:hover, .feature:hover, .pg:hover { transform: translateY(-2px); }
+.btn:active { transform: none; }

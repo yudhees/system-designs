@@ -21,25 +21,13 @@ const status = computed(() => {
   if (alive.value < 3) return { tone: 'warn', text: `${3 - alive.value} down, but the load balancer rerouted. Nobody noticed.` }
   return { tone: 'ok', text: 'Traffic is split evenly. Click a server to crash it.' }
 })
-const use3d = ref(false)
-onMounted(() => {
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const saver = (navigator as unknown as { connection?: { saveData?: boolean } }).connection?.saveData
-  let gl = false
-  try { const c = document.createElement('canvas'); gl = !!(c.getContext('webgl2') || c.getContext('webgl')) } catch { gl = false }
-  use3d.value = gl && !reduce && !saver
-})
 function toggle(i: number) { up.value = up.value.map((v, k) => (k === i ? !v : v)) }
 function reset() { up.value = [true, true, true]; rush.value = false }
 </script>
 
 <template>
   <figure class="lb" aria-label="Load balancer demo">
-    <Hero3D v-if="use3d" :up="up" :rps="rps" :loads="servers.map(s => s.load)" :hot="servers.map(s => s.hot)" @toggle="toggle" @fail="use3d = false" />
-    <div v-if="use3d" class="pick" role="group" aria-label="Crash or recover a server">
-      <button v-for="s in servers" :key="s.i" type="button" :class="{ off: !s.u }" :aria-pressed="!s.u" @click="toggle(s.i)">{{ s.u ? 'Crash' : 'Recover' }} {{ s.name.toLowerCase() }}</button>
-    </div>
-    <svg v-else viewBox="0 0 460 340" role="img" aria-label="Users send requests to a load balancer, which spreads them over three servers">
+    <svg viewBox="0 0 460 340" role="img" aria-label="Users send requests to a load balancer, which spreads them over three servers">
       <!-- users -->
       <g>
         <rect x="2" y="132" width="86" height="76" rx="14" class="box" />
@@ -56,7 +44,7 @@ function reset() { up.value = [true, true, true]; rush.value = false }
       <!-- links + servers -->
       <g v-for="s in servers" :key="s.i">
         <path :d="`M246 170 C 290 170, 280 ${s.y + 40}, 316 ${s.y + 40}`" :class="['flow', s.u ? (s.hot ? 'hot' : 'on') : 'off']" :stroke-width="s.u ? 2 + s.load / 25 : 2" fill="none" />
-        <g class="srv" role="button" tabindex="0" :aria-label="`${s.name} is ${s.u ? 'up. Press to crash it' : 'down. Press to recover it'}`" @click="toggle(s.i)" @keydown.enter.prevent="toggle(s.i)" @keydown.space.prevent="toggle(s.i)">
+        <g :class="['srv', { down: !s.u }]" role="button" tabindex="0" :aria-label="`${s.name} is ${s.u ? 'up. Press to crash it' : 'down. Press to recover it'}`" @click="toggle(s.i)" @keydown.enter.prevent="toggle(s.i)" @keydown.space.prevent="toggle(s.i)">
           <rect x="316" :y="s.y" width="142" height="80" rx="14" :class="['card', s.u ? (s.hot ? 'hot' : 'ok') : 'dead']" />
           <text x="332" :y="s.y + 28" class="t1">{{ s.name }}</text>
           <text x="332" :y="s.y + 50" class="t2">{{ s.u ? `${Math.round(s.load)} req/s` : 'Crashed' }}</text>
@@ -79,31 +67,31 @@ function reset() { up.value = [true, true, true]; rush.value = false }
 
 <style scoped>
 .lb { margin: 0; display: grid; gap: 14px; max-width: 480px; width: 100%; margin-inline: auto; }
-svg { width: 100%; height: auto; display: block; overflow: visible; }
+svg { width: 100%; height: auto; display: block; overflow: visible; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--r-lg); padding: 14px 12px; }
 .t1 { font: 700 16px var(--f-body); fill: var(--ink); }
 .t2 { font: 500 14px var(--f-body); fill: var(--muted); }
 .t1.inv { fill: var(--bg); }
 .box { fill: var(--surface); stroke: var(--line); stroke-width: 2; }
 .lbbox { fill: var(--ink); }
-.card { stroke-width: 2; transition: fill .2s, stroke .2s; }
+.card { stroke-width: 2; transition: fill .35s, stroke .35s, opacity .35s; }
 .card.ok { fill: var(--surface); stroke: var(--line); }
 .card.hot { fill: color-mix(in srgb, var(--bad) 14%, var(--surface)); stroke: var(--bad); }
-.card.dead { fill: var(--sunk, var(--surface)); stroke: var(--line); stroke-dasharray: 6 5; opacity: .75; }
+.card.dead { fill: var(--sunk, var(--surface)); stroke: var(--line); stroke-dasharray: 6 5; }
+.srv text { transition: opacity .3s; }
+.srv.down text { opacity: .55; }
+.lbbox { transform-box: fill-box; transform-origin: center; animation: pulse 3s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.04); } }
 .srv { cursor: pointer; }
 .srv:hover .card.ok, .srv:focus-visible .card.ok { stroke: var(--signal); }
 .srv:focus-visible { outline: none; }
 .track { fill: var(--line); }
 .fill.ok { fill: var(--ok); transition: width .3s; }
 .fill.hot { fill: var(--bad); transition: width .3s; }
-.flow { stroke: var(--signal); stroke-linecap: round; stroke-dasharray: 2 10; animation: dash .9s linear infinite; transition: stroke-width .3s; }
+.flow { transition: stroke .3s, stroke-width .4s, opacity .3s; stroke: var(--signal); stroke-linecap: round; stroke-dasharray: 2 10; animation: dash .9s linear infinite; transition: stroke-width .3s; }
 .flow.hot { stroke: var(--bad); }
 .flow.off { stroke: var(--line); animation: none; stroke-dasharray: 4 8; }
 @keyframes dash { to { stroke-dashoffset: -12; } }
 @media (prefers-reduced-motion: reduce) { .flow { animation: none; } }
-.pick { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.pick button { font: 600 .9rem var(--f-body); background: var(--surface); color: var(--ink); border: 1.5px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; transition: border-color .15s, transform .15s; }
-.pick button:hover { border-color: var(--signal); transform: translateY(-1px); }
-.pick button.off { border-color: var(--bad); color: var(--bad); }
 .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .seg { display: inline-flex; background: var(--sunk, var(--surface)); border: 1.5px solid var(--line); border-radius: 999px; padding: 3px; }
 .seg button { font: 600 .95rem var(--f-body); color: var(--muted); background: none; border: 0; padding: 8px 16px; border-radius: 999px; cursor: pointer; }
