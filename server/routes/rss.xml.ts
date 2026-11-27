@@ -5,9 +5,11 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 export default defineEventHandler((event) => {
   const site = String(useRuntimeConfig(event).public.siteUrl).replace(/\/$/, '')
   const items = [
-    ...lessons.map(l => ({ title: `${l.title}: ${l.headline}`, link: `${site}/labs/${l.slug}`, date: l.date, desc: l.summary, cat: l.topic })),
+    ...lessons.map(l => ({ title: l.headline.toLowerCase().startsWith(l.title.toLowerCase()) ? l.headline : `${l.title}: ${l.headline}`, link: `${site}/labs/${l.slug}`, date: l.date, desc: l.summary, cat: l.topic })),
     ...articles.map(a => ({ title: a.title, link: `${site}/articles/${a.slug}`, date: a.date, desc: a.summary, cat: 'Article' })),
   ].sort((a, b) => b.date.localeCompare(a.date))
+
+  const updated = items[0] ? new Date(items[0].date + 'T06:30:00+05:30').toUTCString() : new Date().toUTCString()
 
   setHeader(event, 'Content-Type', 'application/rss+xml; charset=utf-8')
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -17,8 +19,10 @@ export default defineEventHandler((event) => {
 <link>${site}</link>
 <description>Free, interactive system design labs built from real engineering incidents.</description>
 <language>en</language>
+<lastBuildDate>${updated}</lastBuildDate>
+<ttl>360</ttl>
 <atom:link href="${site}/rss.xml" rel="self" type="application/rss+xml" />
-${items.map(i => `<item><title>${esc(i.title)}</title><link>${i.link}</link><guid>${i.link}</guid><pubDate>${new Date(i.date + 'T06:30:00+05:30').toUTCString()}</pubDate><category>${esc(i.cat)}</category><description>${esc(i.desc)}</description></item>`).join('\n')}
+${items.map(i => `<item><title>${esc(i.title)}</title><link>${i.link}</link><guid isPermaLink="true">${i.link}</guid><pubDate>${new Date(i.date + 'T06:30:00+05:30').toUTCString()}</pubDate><category>${esc(i.cat)}</category><description>${esc(i.desc)}</description></item>`).join('\n')}
 </channel>
 </rss>`
 })
