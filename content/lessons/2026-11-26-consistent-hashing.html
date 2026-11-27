@@ -6,18 +6,18 @@
 <style>
 /* Layout: single reading column (~72ch) with a wide lab band for the simulator; instrument-panel feel, ring as the hero object */
 :root{
-  --bg:#f2f4f7; --surface:#ffffff; --sunk:#e8ecf2; --fg:#16202e; --muted:#5a6678; --line:#d3d9e2;
-  --accent:#2a55c9; --accent-soft:#dfe7fb; --warn:#b4570a; --bad:#b3261e; --good:#1d7a4f;
+  --bg:#f7f6f3; --surface:#ffffff; --sunk:#eeece7; --fg:#17181c; --muted:#5c5f68; --line:#dedbd3;
+  --accent:#4f46e5; --accent-soft:#e8e7fd; --warn:#a35200; --bad:#c62828; --good:#15803d;
   --f-display:"Sora", "Segoe UI", system-ui, sans-serif;
   --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0f141c; --surface:#161d28; --sunk:#1d2633; --fg:#e4e9f1; --muted:#97a3b6; --line:#2b3646;
-  --accent:#7ea2ff; --accent-soft:#1e2a47; --warn:#f0a35a; --bad:#ff8a80; --good:#5fd39a; color-scheme:dark}}
+  --bg:#0e0f14; --surface:#16181f; --sunk:#1d2029; --fg:#ecedf2; --muted:#a1a5b3; --line:#2c303c;
+  --accent:#8b8cff; --accent-soft:#25264a; --warn:#ffa95c; --bad:#ff7b72; --good:#3fcf8e; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0f141c; --surface:#161d28; --sunk:#1d2633; --fg:#e4e9f1; --muted:#97a3b6; --line:#2b3646;
-  --accent:#7ea2ff; --accent-soft:#1e2a47; --warn:#f0a35a; --bad:#ff8a80; --good:#5fd39a; color-scheme:dark}
+  --bg:#0e0f14; --surface:#16181f; --sunk:#1d2029; --fg:#ecedf2; --muted:#a1a5b3; --line:#2c303c;
+  --accent:#8b8cff; --accent-soft:#25264a; --warn:#ffa95c; --bad:#ff7b72; --good:#3fcf8e; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:1.125rem;line-height:1.65;
   padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 64px}

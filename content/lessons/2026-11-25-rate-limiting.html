@@ -7,23 +7,23 @@
 <style>
 /* Layout: one 1040px column of lab sections; the simulator is a two-pane bench (controls | scope) that stacks on phones. */
 :root{
-  --bg:#f3f5f8; --surface:#ffffff; --sunk:#e8ecf2; --line:#d3dae4;
-  --fg:#16202e; --muted:#5a6779; --accent:#2346c8; --accent-soft:#dfe6fb;
-  --ok:#1d8a5a; --bad:#c2412b; --warn:#a66b00;
+  --bg:#f7f6f3; --surface:#ffffff; --sunk:#eeece7; --line:#dedbd3;
+  --fg:#17181c; --muted:#5c5f68; --accent:#4f46e5; --accent-soft:#e8e7fd;
+  --ok:#1d8a5a; --bad:#c62828; --warn:#a35200;
   --c-fixed:#c2412b; --c-slide:#2346c8; --c-bucket:#0f8a86; --c-offered:#9aa6b6;
   --f-display:"Sora","Segoe UI",system-ui,sans-serif;
   --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0f141c; --surface:#161d28; --sunk:#1d2633; --line:#2b3646;
-  --fg:#e5eaf1; --muted:#97a3b5; --accent:#8ea6ff; --accent-soft:#232f52;
-  --ok:#4cc38a; --bad:#ff8a73; --warn:#e6b450;
+  --bg:#0e0f14; --surface:#16181f; --sunk:#1d2029; --line:#2c303c;
+  --fg:#ecedf2; --muted:#a1a5b3; --accent:#8b8cff; --accent-soft:#25264a;
+  --ok:#4cc38a; --bad:#ff7b72; --warn:#ffa95c;
   --c-fixed:#ff8a73; --c-slide:#8ea6ff; --c-bucket:#4fd1c9; --c-offered:#5d6a7c; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0f141c; --surface:#161d28; --sunk:#1d2633; --line:#2b3646;
-  --fg:#e5eaf1; --muted:#97a3b5; --accent:#8ea6ff; --accent-soft:#232f52;
-  --ok:#4cc38a; --bad:#ff8a73; --warn:#e6b450;
+  --bg:#0e0f14; --surface:#16181f; --sunk:#1d2029; --line:#2c303c;
+  --fg:#ecedf2; --muted:#a1a5b3; --accent:#8b8cff; --accent-soft:#25264a;
+  --ok:#4cc38a; --bad:#ff7b72; --warn:#ffa95c;
   --c-fixed:#ff8a73; --c-slide:#8ea6ff; --c-bucket:#4fd1c9; --c-offered:#5d6a7c; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:1.125rem;line-height:1.65;

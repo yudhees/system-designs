@@ -17,9 +17,11 @@
   },
   "dependencies": {
     "marked": "^18.3.0",
-    "nuxt": "^4.7.0"
+    "nuxt": "^4.7.0",
+    "three": "^0.170.0"
   },
   "devDependencies": {
+    "@types/three": "^0.170.0",
     "vitest": "^3.2.7"
   }
 }

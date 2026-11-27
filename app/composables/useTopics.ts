@@ -1,7 +1,7 @@
 import { lessons } from '#content'
 
 // Stable colour per topic so a topic looks the same everywhere on the site.
-const HUES = ['#2f57d0', '#c9761a', '#1f8a5b', '#8a4fd1', '#c0392b', '#0f8a86', '#a0368f', '#5c6f1a']
+const HUES = ['#4f46e5', '#c2570c', '#15803d', '#9333ea', '#c62828', '#0e8f8a', '#be3a8f', '#6b7d12']
 
 export function topicColor(topic: string) {
   let h = 0

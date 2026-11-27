@@ -19,13 +19,14 @@ export default defineNuxtConfig({
   },
 
   app: {
+    pageTransition: { name: 'page', mode: 'out-in' },
     head: {
       htmlAttrs: { lang: 'en' },
       titleTemplate: (t?: string) => (t ? `${t} | System Design Lab` : 'System Design Lab: free, interactive system design'),
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'Free, interactive system design labs built from real engineering incidents. Play with live simulators, then solve a design problem. A new lab every morning.' },
-        { name: 'theme-color', content: '#f4f6f9' },
+        { name: 'theme-color', content: '#f7f6f3' },
         { property: 'og:type', content: 'website' },
         { property: 'og:site_name', content: 'System Design Lab' },
       ],
