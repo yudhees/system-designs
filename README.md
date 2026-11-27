@@ -13,7 +13,7 @@ npm test           # Vitest suite (API routes, feeds, lesson data, workflow guar
 
 | What | Where | Notes |
 | --- | --- | --- |
-| Labs | `app/labs/YYYY-MM-DD-<slug>.vue` | One Vue component per lab, rendered inline on `/labs/<slug>` with the site's own styles. Prose and widgets live in the template, the simulator in `<script setup lang="ts">`, shared styling comes from `app/assets/css/lab.css` (the `.labdoc` kit) and the site tokens. Title, topic, summary, reading time and sections are read from the template at build time. Older labs are standalone HTML in `content/lessons/*.html`, shown in an iframe, and are being converted. |
+| Labs | `app/labs/YYYY-MM-DD-<slug>.vue` | One Vue component per lab, rendered inline on `/labs/<slug>` with the site's own styles. Prose and widgets live in the template, the simulator in `<script setup lang="ts">`, shared styling comes from `app/assets/css/lab.css` (the `.labdoc` kit) and the site tokens. Title, topic, summary, reading time and sections are read from the template at build time. |
 | Articles | `content/articles/<slug>.md` | Markdown with `title`, `date`, `summary` front matter. |
 | About page, LinkedIn, contact | `app/app.config.ts` | Empty fields are hidden. |
 
@@ -34,9 +34,9 @@ GitHub Action "Publish lesson"
 Vercel ── deploys main
 ```
 
-The scheduled task's prompt needs one extra step, plus this repository attached as a source:
+The scheduled task's prompt asks for a native lab, plus this repository attached as a source:
 
-> After publishing the artifact, save the exact same HTML to `content/lessons/<YYYY-MM-DD>-<slug>.html` in the `yudhees/system-designs` repository (slug: lowercase topic, hyphens, e.g. `idempotency-keys`). Run `node scripts/check-lessons.mjs <that file>`, commit only that file with the message `lesson: <Topic> (<YYYY-MM-DD>)`, and push it to your working branch. Don't open a pull request; a GitHub Action publishes it.
+> Build the lesson as `app/labs/<YYYY-MM-DD>-<slug>.vue` in the `yudhees/system-designs` repository (slug: lowercase topic, hyphens, e.g. `idempotency-keys`), following the existing labs and the `.labdoc` kit. Verify it in the dev server, run `npm test` and `node scripts/check-lessons.mjs`, commit only that file with the message `lesson: <Topic> (<YYYY-MM-DD>)`, and push it to your working branch. Don't open a pull request; a GitHub Action publishes it.
 
 ## Auto-merge for Claude pull requests
 
