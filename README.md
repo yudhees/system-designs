@@ -37,6 +37,12 @@ The scheduled task's prompt needs one extra step, plus this repository attached 
 
 > After publishing the artifact, save the exact same HTML to `content/lessons/<YYYY-MM-DD>-<slug>.html` in the `yudhees/system-designs` repository (slug: lowercase topic, hyphens, e.g. `idempotency-keys`). Run `node scripts/check-lessons.mjs <that file>`, commit only that file with the message `lesson: <Topic> (<YYYY-MM-DD>)`, and push it to your working branch. Don't open a pull request; a GitHub Action publishes it.
 
+## Auto-merge for Claude pull requests
+
+`.github/workflows/auto-merge.yml` runs after every CI run. When CI (lesson check + `nuxt build`) passes on an open pull request from a `claude/*` branch of this repository, it squash-merges the PR into `main` and deletes the branch, so Vercel deploys it without a manual merge.
+
+It skips a PR that is a draft, has the `no-automerge` label, or got new commits after CI started. To hold a Claude PR for review, mark it as a draft or add that label.
+
 ## Newsletter
 
 `POST /api/subscribe` adds an email to the provider set by `NUXT_NEWSLETTER_PROVIDER`:
