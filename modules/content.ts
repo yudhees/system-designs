@@ -156,12 +156,6 @@ export default defineNuxtModule({
     nuxt.hook('nitro:config', (cfg) => {
       cfg.alias ||= {}
       cfg.alias['#content'] = tpl.dst
-      cfg.prerender ||= {}
-      cfg.prerender.routes ||= []
-      cfg.prerender.routes.push(
-        ...data.lessons.map(l => `/labs/${l.slug}`),
-        ...data.articles.map(a => `/articles/${a.slug}`),
-      )
     })
 
     nuxt.options.watch.push(join(root, 'content'))
