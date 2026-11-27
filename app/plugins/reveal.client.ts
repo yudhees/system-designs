@@ -22,7 +22,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       if (el.getBoundingClientRect().top < window.innerHeight * .92) return
       const n = seen.get(el.parentElement as Element) ?? 0
       seen.set(el.parentElement as Element, n + 1)
-      el.style.setProperty('--d', `${Math.min(n, 5) * 70}ms`)
+      el.style.setProperty('--d', `${Math.min(n, 4) * 50}ms`)
       el.classList.add('rv')
       io.observe(el)
     })
