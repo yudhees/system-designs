@@ -13,6 +13,7 @@ const year = new Date().getFullYear()
       <nav aria-label="Footer">
         <NuxtLink to="/labs">All labs</NuxtLink>
         <NuxtLink to="/articles">Articles</NuxtLink>
+        <NuxtLink to="/suggest">Suggest a topic</NuxtLink>
         <NuxtLink to="/about">About</NuxtLink>
         <a href="/rss.xml">RSS feed</a>
         <a v-if="author.linkedin" :href="author.linkedin" rel="me noopener" target="_blank">LinkedIn</a>

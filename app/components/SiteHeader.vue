@@ -5,6 +5,7 @@ watch(() => route.fullPath, () => { open.value = false })
 const links = [
   { to: '/labs', label: 'Labs' },
   { to: '/articles', label: 'Articles' },
+  { to: '/suggest', label: 'Suggest a topic' },
   { to: '/about', label: 'About' },
 ]
 </script>

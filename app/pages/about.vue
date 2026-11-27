@@ -59,7 +59,7 @@ const initials = author.name.slice(0, 1).toUpperCase()
 
       <aside class="card" aria-labelledby="contact-h">
         <h2 id="contact-h">Get in touch</h2>
-        <p class="muted">For corrections, topic requests or collaboration, message me on LinkedIn.</p>
+        <p class="muted">Want a lab on something specific? <NuxtLink to="/suggest">Suggest a topic</NuxtLink>. For corrections or collaboration, message me on LinkedIn.</p>
         <a v-if="author.linkedin" :href="author.linkedin" class="li" target="_blank" rel="me noopener">{{ strip(author.linkedin) }}</a>
         <ul v-if="contacts.length">
           <li v-for="c in contacts" :key="c.label">
