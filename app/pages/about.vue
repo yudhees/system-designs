@@ -18,7 +18,7 @@ const initials = author.name.slice(0, 1).toUpperCase()
       <div class="avatar" aria-hidden="true">{{ initials }}</div>
       <div class="who">
         <h1 id="about-h">{{ author.name }}</h1>
-        <p class="role">{{ author.title }}<span class="sep" aria-hidden="true" />{{ author.focus }}</p>
+        <p class="role">{{ author.title }}</p>
       </div>
       <div class="actions">
         <a v-if="author.linkedin" :href="author.linkedin" class="btn btn-primary" target="_blank" rel="me noopener">
@@ -33,18 +33,18 @@ const initials = author.name.slice(0, 1).toUpperCase()
       <div class="main">
         <p class="summary">{{ author.summary }}</p>
 
-        <section aria-labelledby="exp-h">
-          <h2 id="exp-h">What I work on</h2>
-          <dl class="exp">
-            <div v-for="e in author.expertise" :key="e.title">
-              <dt>{{ e.title }}</dt>
-              <dd>{{ e.text }}</dd>
-            </div>
-          </dl>
+        <section aria-labelledby="how-h">
+          <h2 id="how-h">How the labs work</h2>
+          <ol class="how">
+            <li><span><b>A real incident.</b> Each lab opens with a system at scale and the numbers that forced a change.</span></li>
+            <li><span><b>The concept.</b> The design that fixed it, its trade-offs and how it fails.</span></li>
+            <li><span><b>A live simulator.</b> Push the naive design until it breaks, then compare the better one.</span></li>
+            <li><span><b>Solve it.</b> A practical design problem with hints and a model answer.</span></li>
+          </ol>
         </section>
 
         <section aria-labelledby="stack-h">
-          <h2 id="stack-h">Tools I use daily</h2>
+          <h2 id="stack-h">Tech stack</h2>
           <ul class="stack">
             <li v-for="s in author.stack" :key="s">{{ s }}</li>
           </ul>
@@ -83,7 +83,6 @@ const initials = author.name.slice(0, 1).toUpperCase()
 .who { display: grid; gap: 6px; }
 .who h1 { font-size: clamp(2.2rem, 5vw, 3.2rem); }
 .role { font-size: 1.12rem; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
-.sep { width: 5px; height: 5px; border-radius: 50%; background: var(--line); margin: 0 12px; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .actions svg { width: 18px; height: 18px; }
 .grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 64px; align-items: start; margin-top: 40px; }
@@ -92,10 +91,10 @@ const initials = author.name.slice(0, 1).toUpperCase()
 .main h2 { font-size: 1.35rem; }
 .main p { font-size: 1.04rem; }
 .summary { font-family: var(--f-display); font-size: clamp(1.25rem, 2.2vw, 1.55rem) !important; font-weight: 600; line-height: 1.4; letter-spacing: -0.015em; }
-.exp { margin: 0; display: grid; gap: 0; }
-.exp div { display: grid; grid-template-columns: 200px 1fr; gap: 20px; padding: 16px 0; border-top: 1px solid var(--line); }
-.exp dt { font-weight: 600; }
-.exp dd { margin: 0; color: var(--muted); }
+.how { margin: 0; padding: 0; list-style: none; counter-reset: how; display: grid; }
+.how li { counter-increment: how; display: grid; grid-template-columns: 32px 1fr; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); color: var(--muted); }
+.how li::before { content: counter(how); font-family: var(--f-display); font-weight: 800; color: var(--signal); }
+.how b { color: var(--ink); font-weight: 600; }
 .stack { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .stack li { border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 12px; font-weight: 500; font-size: .95rem; background: var(--surface); }
 .card { position: sticky; top: 88px; min-width: 0; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; }
@@ -112,7 +111,6 @@ const initials = author.name.slice(0, 1).toUpperCase()
   .actions { grid-column: 1 / -1; }
   .grid { grid-template-columns: 1fr; gap: 40px; }
   .card { position: static; }
-  .exp div { grid-template-columns: 1fr; gap: 4px; }
 }
 @media (max-width: 480px) { .avatar { width: 64px; height: 64px; font-size: 1.8rem; } }
 </style>
