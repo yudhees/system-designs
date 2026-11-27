@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { lessons, articles } from '#content'
 const latest = lessons[0]
-const recent = lessons.slice(1, 7)
+const recent = lessons.slice(0, 7)
 const topics = useTopics()
 const { isDone } = useProgress()
 useSeoMeta({ ogTitle: 'System Design Lab', ogDescription: 'Free, interactive system design labs built from real engineering incidents.' })
@@ -64,10 +64,10 @@ const parts = [
     <section v-if="recent.length" class="recent wrap" aria-labelledby="recent-h">
       <div class="list">
         <div class="list-head">
-          <h2 id="recent-h">Earlier labs</h2>
+          <h2 id="recent-h">Latest labs</h2>
           <NuxtLink to="/labs">See all</NuxtLink>
         </div>
-        <LabRow v-for="l in recent" :key="l.slug" :lab="l" :done="isDone(l.slug)" />
+        <LabRow v-for="(l, i) in recent" :key="l.slug" :lab="l" :done="isDone(l.slug)" :latest="i === 0" />
       </div>
       <aside class="topics" aria-label="Topics">
         <h3>Topics so far</h3>
