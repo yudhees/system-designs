@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}code,sub,small,.mono{font-size:max(14px,.88em)!important}</style></head><body>
 <title>System Design Lab — Idempotency Keys (2026-11-27)</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -24,7 +24,7 @@
   --replay:#A396FF; --replay-soft:#2A2550; --ok:#52C68B; --ok-soft:#173727; color-scheme:dark}
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:18px;line-height:1.65;
   padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 64px}
 .wrap{max-width:760px;margin:0 auto}
 .wide{max-width:1080px;margin:0 auto}
@@ -37,17 +37,17 @@ a{color:var(--accent)}
 code,.mono{font-family:var(--f-mono);font-size:.88em}
 code{background:var(--sunk);padding:.1em .35em;border-radius:4px}
 section{display:grid;gap:16px;padding-block:40px;border-top:1px solid var(--line)}
-.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.eyebrow{font-family:var(--f-mono);font-size:0.875rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
 .lead{font-size:1.1rem;color:var(--muted)}
 ul{margin:0;padding-left:1.2em;display:grid;gap:6px}
 
 header{padding-block:48px 32px;display:grid;gap:18px}
 .hook{font-family:var(--f-mono);font-size:.95rem;color:var(--muted);border-left:3px solid var(--dup);padding-left:12px}
 .tldr{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:grid;gap:6px}
-.tldr b.tag{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;color:var(--accent)}
+.tldr b.tag{font-family:var(--f-mono);font-size:0.875rem;letter-spacing:.12em;color:var(--accent)}
 
 .callout{border-radius:8px;padding:14px 16px;display:grid;gap:4px;font-size:.95rem}
-.callout .tag{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:500}
+.callout .tag{font-family:var(--f-mono);font-size:0.875rem;letter-spacing:.12em;text-transform:uppercase;font-weight:500}
 .c-key{background:var(--accent-soft)} .c-key .tag{color:var(--accent)}
 .c-gotcha{background:var(--warn-soft)} .c-gotcha .tag{color:var(--warn)}
 .c-num{background:var(--replay-soft)} .c-num .tag{color:var(--replay)}
@@ -56,17 +56,17 @@ header{padding-block:48px 32px;display:grid;gap:18px}
 .story{display:grid;gap:0;border-left:2px solid var(--line);margin-left:6px}
 .beat{position:relative;padding:0 0 18px 20px;display:grid;gap:4px}
 .beat::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
-.beat .lbl{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.beat .lbl{font-family:var(--f-mono);font-size:0.875rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
 /* analogy */
 .analogy{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:6px;min-width:0}
-.tile .t{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.tile .t{font-family:var(--f-mono);font-size:0.875rem;color:var(--muted)}
 
 .tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 table{border-collapse:collapse;width:100%;min-width:620px;font-size:.92rem}
 th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--sunk)}
+th{font-family:var(--f-mono);font-size:0.875rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--sunk)}
 tr:last-child td{border-bottom:0}
 .bad{color:var(--dup);font-weight:600} .good{color:var(--ok);font-weight:600} .meh{color:var(--warn);font-weight:600}
 
@@ -78,7 +78,7 @@ tr:last-child td{border-bottom:0}
 .ctl{display:grid;gap:4px;min-width:0}
 .ctl label{font-size:.88rem;font-weight:500;display:flex;justify-content:space-between;gap:8px}
 .ctl label output{font-family:var(--f-mono);color:var(--accent)}
-.ctl small{color:var(--muted);font-size:.8rem;line-height:1.35}
+.ctl small{color:var(--muted);font-size:0.875rem;line-height:1.35}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .ctl label.switch{display:flex;justify-content:flex-start;align-items:center;gap:10px;font-size:.9rem;font-weight:500;cursor:pointer}
 .switch input{width:18px;height:18px;accent-color:var(--accent)}
@@ -92,19 +92,19 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 .lane{border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;min-width:0;background:var(--bg)}
 .lane-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
 .lane-head h3{font-size:1.05rem}
-.pill{font-family:var(--f-mono);font-size:.72rem;padding:2px 8px;border-radius:99px}
+.pill{font-family:var(--f-mono);font-size:0.875rem;padding:2px 8px;border-radius:99px}
 .pill.naive{background:var(--dup-soft);color:var(--dup)} .pill.safe{background:var(--ok-soft);color:var(--ok)}
 canvas{width:100%;height:160px;display:block;border-radius:6px;background:var(--surface)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;gap:0;min-width:0}
 .stat .v{font-family:var(--f-mono);font-size:1.25rem;font-weight:500;font-variant-numeric:tabular-nums}
-.stat .k{font-size:.74rem;color:var(--muted);line-height:1.25}
+.stat .k{font-size:0.875rem;color:var(--muted);line-height:1.25}
 .stat.alert .v{color:var(--dup)}
 .stat.alert{border-color:var(--dup)}
 .ledger{display:flex;flex-wrap:wrap;gap:4px;min-height:30px;align-content:flex-start;max-height:96px;overflow:hidden}
-.chip{font-family:var(--f-mono);font-size:.72rem;padding:2px 6px;border-radius:4px;background:var(--ok-soft);color:var(--ok)}
+.chip{font-family:var(--f-mono);font-size:0.875rem;padding:2px 6px;border-radius:4px;background:var(--ok-soft);color:var(--ok)}
 .chip.dup{background:var(--dup-soft);color:var(--dup);font-weight:600}
-.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.8rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:0.875rem;color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .money{font-size:.9rem;color:var(--muted)}
@@ -121,7 +121,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
 .stack{display:grid;gap:10px}
 .stack .row{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
 .stack .row:last-child{border-bottom:0}
-.stack .row b{font-family:var(--f-mono);font-size:.85rem;color:var(--accent)}
+.stack .row b{font-family:var(--f-mono);font-size:0.875rem;color:var(--accent)}
 @media (max-width:520px){.stack .row{grid-template-columns:1fr;gap:2px}}
 .recap{background:var(--ink);color:var(--bg);border-radius:12px;padding:22px;display:grid;gap:12px}
 .recap h2{color:var(--bg)}
@@ -174,18 +174,18 @@ details > div{margin-top:10px;display:grid;gap:10px}
   <div class="flow" role="img" aria-label="Three failure points: before reaching the server, during processing, after completion when the response is lost">
   <svg viewBox="0 0 640 150">
     <rect x="10" y="45" width="90" height="50" rx="8" fill="var(--sunk)" stroke="var(--line)"/>
-    <text x="55" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="13">client</text>
+    <text x="55" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="14">client</text>
     <rect x="270" y="45" width="110" height="50" rx="8" fill="var(--sunk)" stroke="var(--line)"/>
-    <text x="325" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="13">server</text>
+    <text x="325" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="14">server</text>
     <rect x="540" y="45" width="90" height="50" rx="8" fill="var(--sunk)" stroke="var(--line)"/>
-    <text x="585" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="13">payments</text>
+    <text x="585" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="14">payments</text>
     <line x1="100" y1="60" x2="270" y2="60" stroke="var(--accent)" stroke-width="2"/>
     <line x1="380" y1="70" x2="540" y2="70" stroke="var(--accent)" stroke-width="2"/>
     <line x1="270" y1="82" x2="100" y2="82" stroke="var(--dup)" stroke-width="2" stroke-dasharray="5 4"/>
-    <text x="185" y="34" text-anchor="middle" fill="var(--ok)" font-family="IBM Plex Sans, sans-serif" font-size="12">① before connect: safe to retry</text>
-    <text x="460" y="34" text-anchor="middle" fill="var(--warn)" font-family="IBM Plex Sans, sans-serif" font-size="12">② mid-processing: work in limbo</text>
-    <text x="185" y="118" text-anchor="middle" fill="var(--dup)" font-family="IBM Plex Sans, sans-serif" font-size="12">③ after completion: response lost</text>
-    <text x="185" y="136" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="11">client can't tell ③ from ①</text>
+    <text x="185" y="34" text-anchor="middle" fill="var(--ok)" font-family="IBM Plex Sans, sans-serif" font-size="14">① before connect: safe to retry</text>
+    <text x="460" y="34" text-anchor="middle" fill="var(--warn)" font-family="IBM Plex Sans, sans-serif" font-size="14">② mid-processing: work in limbo</text>
+    <text x="185" y="118" text-anchor="middle" fill="var(--dup)" font-family="IBM Plex Sans, sans-serif" font-size="14">③ after completion: response lost</text>
+    <text x="185" y="136" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="14">client can't tell ③ from ①</text>
   </svg></div>
 
   <div class="callout c-key"><span class="tag">Key idea</span>
@@ -456,9 +456,9 @@ details > div{margin-top:10px;display:grid;gap:10px}
       const box = (x, label, sub, stroke) => {
         ctx.fillStyle = col.sunk; ctx.strokeStyle = stroke || col.line; ctx.lineWidth = stroke ? 2 : 1;
         ctx.beginPath(); ctx.roundRect(x, by, bw, bh, 7); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = col.ink; ctx.font = '600 12px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillStyle = col.ink; ctx.font = '600 14px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'center';
         ctx.fillText(label, x + bw / 2, by + 20);
-        ctx.fillStyle = col.muted; ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillText(sub, x + bw / 2, by + 36);
+        ctx.fillStyle = col.muted; ctx.font = '14px "IBM Plex Mono", monospace'; ctx.fillText(sub, x + bw / 2, by + 36);
       };
       const flash = this.flashes.length ? (this.flashes[this.flashes.length - 1].dup ? col.dup : col.ok) : null;
       box(cx, 'Shopper app', 'retries', null);
@@ -468,7 +468,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
       if (this.mode === 'key') {
         ctx.fillStyle = col.surface; ctx.strokeStyle = col.line; ctx.lineWidth = 1;
         ctx.beginPath(); ctx.roundRect(sx, by + bh + 50, bw, 34, 6); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = col.muted; ctx.font = '11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillStyle = col.muted; ctx.font = '14px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
         ctx.fillText('keys: ' + this.store.size, sx + bw / 2, by + bh + 71);
         ctx.strokeStyle = col.line; ctx.beginPath(); ctx.moveTo(sx + bw / 2, by + bh); ctx.lineTo(sx + bw / 2, by + bh + 50); ctx.stroke();
       }
@@ -501,7 +501,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
         ctx.fillStyle = f.dup ? col.dup : col.ok; ctx.beginPath(); ctx.arc(x, by + bh / 2, 4, 0, Math.PI * 2); ctx.fill();
       }
       // footer label
-      ctx.fillStyle = col.muted; ctx.font = '11px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillStyle = col.muted; ctx.font = '14px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'left';
       ctx.fillText('requests →', x0, by - 8);
       ctx.fillText('← responses', x0, yRes + 22);
     }

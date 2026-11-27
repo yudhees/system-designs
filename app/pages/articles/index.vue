@@ -43,7 +43,7 @@ const rest = articles.slice(1)
 .feature h2 { font-size: clamp(1.6rem, 3vw, 2rem); }
 .feature p { color: var(--muted); }
 .feature .meta { color: var(--muted); font-size: .88rem; }
-.tag { font: 600 .74rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--signal); }
+.tag { font: 600 0.875rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--signal); }
 .list { list-style: none; padding: 0; margin: 0; max-width: 760px; }
 .list a { display: grid; gap: 8px; padding: 24px 0; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
 .list a:hover h2 { color: var(--signal); }

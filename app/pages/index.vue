@@ -121,7 +121,7 @@ const parts = [
 .today-card a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
 .today-card h2 { font-size: clamp(1.7rem, 3.6vw, 2.7rem); max-width: 26ch; }
 .today-meta { display: flex; gap: 14px; align-items: center; font-size: .92rem; opacity: .8; }
-.flag { background: var(--spark-fill); color: #14233b; font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: .82rem; opacity: 1; }
+.flag { background: var(--spark-fill); color: #14233b; font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: 0.875rem; opacity: 1; }
 .summary { font-size: 1.08rem; max-width: 66ch; opacity: .85; }
 .today-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; font-size: .92rem; }
 .today-foot .topic, .today-foot .muted { color: color-mix(in srgb, var(--bg) 70%, transparent); }
@@ -161,5 +161,5 @@ const parts = [
 .art-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 32px; }
 .art { display: grid; gap: 8px; padding: 20px 0; border-top: 1px solid var(--line); color: var(--ink); text-decoration: none; }
 .art:hover h3 { color: var(--signal); }
-.small { font-size: .85rem; }
+.small { font-size: 0.875rem; }
 </style>

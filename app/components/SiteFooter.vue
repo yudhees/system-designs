@@ -17,7 +17,7 @@ const year = new Date().getFullYear()
         <NuxtLink to="/about">About</NuxtLink>
         <a href="/rss.xml">RSS feed</a>
         <a v-if="author.linkedin" :href="author.linkedin" rel="me noopener" target="_blank">LinkedIn</a>
-        <a v-if="author.github" :href="author.github" rel="me noopener" target="_blank">GitHub</a>
+        <a v-if="author.showGithub && author.github" :href="author.github" rel="me noopener" target="_blank">GitHub</a>
       </nav>
     </div>
     <div class="wrap legal muted">Made by {{ author.name }}, {{ year }}. Lab sources are cited inside each lab.</div>
@@ -32,5 +32,5 @@ const year = new Date().getFullYear()
 nav { display: flex; flex-wrap: wrap; gap: 8px 22px; align-content: start; }
 nav a { color: var(--ink); text-decoration: none; }
 nav a:hover { color: var(--signal); }
-.legal { margin-top: 28px; font-size: .85rem; }
+.legal { margin-top: 28px; font-size: 0.875rem; }
 </style>

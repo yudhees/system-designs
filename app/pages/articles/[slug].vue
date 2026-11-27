@@ -29,7 +29,7 @@ useSeoMeta({ title: a.title, description: a.summary, ogTitle: a.title, ogDescrip
 .head { display: grid; gap: 14px; margin: 16px 0 36px; max-width: 30ch; }
 .head h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); }
 .head p { font-size: .95rem; }
-.tag { font: 600 .74rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--signal); }
+.tag { font: 600 0.875rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--signal); }
 .sub { margin-top: 64px; max-width: 68ch; display: grid; gap: 14px; border-top: 2px solid var(--ink); padding-top: 24px; }
 .sub h2 { font-size: 1.4rem; }
 </style>

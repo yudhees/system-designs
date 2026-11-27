@@ -29,13 +29,13 @@ const color = computed(() => topicColor(props.lab.topic))
 .lab:hover .go { transform: translateX(4px); color: var(--signal); }
 .date { display: grid; line-height: 1.1; padding-top: 2px; }
 .d { font-family: var(--f-display); font-weight: 800; font-size: 1.9rem; letter-spacing: -0.03em; }
-.m { font-size: .8rem; color: var(--muted); }
+.m { font-size: 0.875rem; color: var(--muted); }
 .body { display: grid; gap: 6px; min-width: 0; }
 h3 { font-size: 1.3rem; }
 h3 a { color: var(--ink); text-decoration: none; }
 .stretch::after { content: ""; position: absolute; inset: 0; }
 .headline { color: var(--muted); max-width: 60ch; }
-.meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .86rem; margin-top: 2px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.875rem; margin-top: 2px; }
 .done { color: var(--ok); font-weight: 600; }
 .done::before { content: "✓ "; }
 .go { width: 22px; height: 22px; margin-top: 8px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); transition: transform .15s, color .15s; }
