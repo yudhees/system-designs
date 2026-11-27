@@ -206,28 +206,28 @@ rate = 42 × 45/60 + 18 = 49.5  → the next request trips the limit</div>
 
 <section>
   <span class="eyebrow">Solve it</span>
-  <h2>Supplier quotas for availability fan-out</h2>
+  <h2>The concert-night route quota</h2>
   <div class="scenario">
-    <p>Your meta-search API fans every hotel search out to supplier APIs. Supplier <b>X</b> contractually allows <b>50 requests/second across your whole account</b> and suspends your key for an hour after repeated 429s. Search runs as a Node service on Fargate that autoscales from 4 to 24 tasks. The same supplier also serves <b>prebook and book</b> calls, which carry revenue. Last Friday a promo email caused a search spike: tasks scaled out, each task's in-process limiter allowed 50 rps, and the supplier suspended you mid-evening, failing bookings too.</p>
+    <p>A ride-hailing app asks a third-party maps provider for driving routes and arrival times. The provider's contract allows <b>50 requests/second across your whole account</b> and suspends your key for an hour after repeated 429s. The routing service runs as app servers that autoscale from 4 to 24. The same provider also prices every trip request, a call that carries revenue, while the "car is 4 minutes away" estimate on the map is nice to have. Last Friday a concert ended, riders opened the app all at once, servers scaled out, each server's in-process limiter allowed 50 rps, and the provider suspended the key mid-evening. Trip requests started failing too.</p>
     <h3>Design question</h3>
     <ul>
       <li>Where does the limit state live, and what algorithm do you use?</li>
-      <li>How do you guarantee booking traffic still gets through when search saturates the quota?</li>
-      <li>What does a search request do when it can't get a token, and what happens if Redis is unreachable?</li>
+      <li>How do you guarantee trip requests still get through when map estimates saturate the quota?</li>
+      <li>What does an estimate request do when it can't get a token, and what happens if the shared store is unreachable?</li>
     </ul>
   </div>
-  <details><summary>Hint 1: count the right thing</summary><div><p>The limit belongs to the supplier, not to your users. Key the limiter on <code>supplier_id</code> (and credential), not on caller IP, and enforce it on the <b>outbound</b> path. Per-task limits are the "Per node, L" mode from the simulator: N tasks, N×L.</p></div></details>
-  <details><summary>Hint 2: Stripe's load shedder</summary><div><p>Stripe reserves a slice of capacity for critical methods. Apply the same idea per supplier: two classes of traffic, one quota.</p></div></details>
-  <details><summary>Hint 3: failing open is not always right</summary><div><p>Stripe fails open because blocking its own customers is worse than briefly overrunning its own capacity. Here, overrunning means a supplier ban. Which way should <i>this</i> limiter fail?</p></div></details>
+  <details><summary>Hint 1: count the right thing</summary><div><p>The limit belongs to the provider, not to your riders. Key the limiter on the provider and credential, not on caller IP, and enforce it on the <b>outbound</b> path. Per-server limits are the "Per node, L" mode from the simulator: N servers, N×L.</p></div></details>
+  <details><summary>Hint 2: Stripe's load shedder</summary><div><p>Stripe reserves a slice of capacity for critical methods. Apply the same idea to the provider: two classes of traffic, one quota.</p></div></details>
+  <details><summary>Hint 3: failing open is not always right</summary><div><p>Stripe fails open because blocking its own customers is worse than briefly overrunning its own capacity. Here, overrunning means a provider ban. Which way should <i>this</i> limiter fail?</p></div></details>
   <details><summary>Model answer</summary><div class="answer">
     <ol>
-      <li><b>Shared token bucket in ElastiCache Redis</b>, key <code>rl:supplier:X</code>, rate 50/s, capacity ~50 (one second of burst, matching how suppliers usually meter). Read-refill-spend runs as one Lua script so it is atomic across 24 tasks. Leave headroom: target 45/s, since the supplier's clock and window are not yours.</li>
-      <li><b>Reserve booking capacity.</b> Two buckets that share the quota: search may only spend down to a floor (e.g. it gets 40/s), prebook/book draw from the full 50. Equivalent: one bucket, and search requests are rejected when tokens &lt; reserve.</li>
-      <li><b>Cut Redis round trips with leases.</b> Each task takes tokens in small batches (e.g. 5 at a time) and spends them locally. Lease size bounds the overshoot to roughly tasks × lease, so keep it small.</li>
-      <li><b>No token, no supplier call.</b> Serve that supplier's result from the price/availability cache with a stale flag, or omit it from the result set. Do not queue search work: the user has left by the time it runs. Booking calls may wait briefly (bounded, e.g. 300 ms) for a token.</li>
-      <li><b>Fail closed to a conservative local limit.</b> If Redis is unreachable, each task falls back to <code>floor(45 / expected_max_tasks)</code> rps from an in-process bucket, the "Per node, L/N" mode: it under-admits, but it cannot get you banned. Alert on it.</li>
-      <li><b>Respect the supplier's signal.</b> On a 429 or <code>Retry-After</code>, write a cooldown flag to Redis with that TTL so every task backs off at once, the same trick Cloudflare uses with its cached mitigation flag.</li>
-      <li><b>Dark launch it</b>: log would-be rejections per supplier for a week before enforcing, then turn on per supplier behind a flag.</li>
+      <li><b>Shared token bucket in a fast shared store</b>, key <code>rl:maps-provider</code>, rate 50/s, capacity ~50 (one second of burst, matching how providers usually meter). Read-refill-spend runs as one atomic script so it is safe across 24 servers. Leave headroom: target 45/s, since the provider's clock and window are not yours.</li>
+      <li><b>Reserve capacity for trip pricing.</b> Two buckets that share the quota: estimates may only spend down to a floor (e.g. they get 40/s), pricing draws from the full 50. Equivalent: one bucket, and estimate requests are rejected when tokens &lt; reserve.</li>
+      <li><b>Cut round trips with leases.</b> Each server takes tokens in small batches (e.g. 5 at a time) and spends them locally. Lease size bounds the overshoot to roughly servers × lease, so keep it small.</li>
+      <li><b>No token, no provider call.</b> Serve a recent cached estimate with a stale flag, or show a rougher estimate computed locally. Do not queue estimate work: the rider has moved on by the time it runs. Pricing calls may wait briefly (bounded, e.g. 300 ms) for a token.</li>
+      <li><b>Fail closed to a conservative local limit.</b> If the shared store is unreachable, each server falls back to <code>floor(45 / expected_max_servers)</code> rps from an in-process bucket, the "Per node, L/N" mode: it under-admits, but it cannot get you banned. Alert on it.</li>
+      <li><b>Respect the provider's signal.</b> On a 429 or <code>Retry-After</code>, write a cooldown flag to the shared store with that TTL so every server backs off at once, the same trick Cloudflare uses with its cached mitigation flag.</li>
+      <li><b>Dark launch it</b>: log would-be rejections for a week before enforcing, then turn it on behind a flag.</li>
     </ol>
     <pre class="code">-- KEYS[1]=bucket  ARGV: rate/s, capacity, now_ms, want, floor
 local b = redis.call('HMGET', KEYS[1], 't', 'ts')
@@ -239,21 +239,21 @@ local granted = 0
 if t - want >= floor then t = t - want; granted = want end
 redis.call('HSET', KEYS[1], 't', t, 'ts', now)
 redis.call('PEXPIRE', KEYS[1], math.ceil(cap / rate * 1000) * 2)
-return granted   -- search: floor = reserve; booking: floor = 0</pre>
-    <p class="hint" style="font-size:.85rem;color:var(--muted)">Use Redis server time (<code>TIME</code>) rather than each task's clock if Fargate task clocks may drift; passing <code>now</code> in keeps the example short.</p>
+return granted   -- estimates: floor = reserve; pricing: floor = 0</pre>
+    <p class="hint" style="font-size:.85rem;color:var(--muted)">Use the store's own clock rather than each server's clock if server clocks may drift; passing <code>now</code> in keeps the example short.</p>
   </div></details>
 </section>
 
 <section>
-  <span class="eyebrow">Apply to your stack</span>
-  <h2>Where this lands in Laravel, Node, MongoDB, Kafka and AWS</h2>
+  <span class="eyebrow">In practice</span>
+  <h2>Where these ideas show up in real tools</h2>
   <div class="stack">
-    <div><b>Laravel</b><span><code>RateLimiter::for()</code> plus the <code>throttle</code> middleware keep a hit counter with a decay timer in your cache store, which behaves like a fixed window. That's fine for login and OTP abuse. For partner-facing API quotas, use the Redis store and a Lua token bucket like the one above, or <code>Redis::throttle()</code> inside queued jobs that call suppliers.</span></div>
-    <div><b>Node</b><span>Put the outbound limiter in the HTTP client wrapper for each supplier, not in route middleware. Batch token leases per task so a search fan-out of 30 suppliers doesn't cost 30 Redis round trips.</span></div>
-    <div><b>MongoDB</b><span>Keep hot counters out of it. A per-request <code>$inc</code> on one document is a single-document write hotspot. Mongo is the right place for the limit <i>configuration</i> per partner and supplier, loaded into Redis or memory.</span></div>
-    <div><b>Kafka</b><span>Rate-limit consumers, not producers. A consumer that pushes webhooks to a partner can <code>pause()</code> its partitions when that partner's bucket is empty and <code>resume()</code> later. Lag grows instead of 429s, and lag is something you already alert on.</span></div>
-    <div><b>AWS</b><span>API Gateway throttling is itself a token bucket (steady rate plus burst) and returns <code>429</code>. AWS documents it as best-effort, a target rather than a guaranteed ceiling, so keep your own limiter for contractual limits. WAF rate-based rules work at the edge per IP, the Cloudflare-style first line.</span></div>
-    <div><b>Fargate</b><span>Autoscaling changes N under you. Any per-task limit has to be derived from max task count, or it silently grows the effective limit on every scale-out.</span></div>
+    <div><b>Web frameworks</b><span>Built-in rate-limit middleware usually keeps a hit counter with a decay timer in your cache, which behaves like a fixed window. That's fine for login and one-time-code abuse. For partner-facing quotas, use a shared store and an atomic token bucket like the one above.</span></div>
+    <div><b>Outbound HTTP clients</b><span>Put the limiter in the client wrapper for each provider, not in route middleware. Batch token leases per server so a request that fans out to 30 providers doesn't cost 30 round trips to the shared store.</span></div>
+    <div><b>Databases</b><span>Keep hot counters out of them. A per-request increment on one row or document is a write hotspot. A database is the right place for the limit <i>configuration</i> per partner and provider, loaded into the shared store or memory.</span></div>
+    <div><b>Queues and logs</b><span>Rate-limit consumers, not producers. A consumer that pushes notifications to a partner can pause its partitions when that partner's bucket is empty and resume later. Lag grows instead of 429s, and lag is something you already alert on.</span></div>
+    <div><b>API gateways and edge rules</b><span>Gateway throttling is usually a token bucket (steady rate plus burst) that returns <code>429</code>, and some providers document it as best-effort, a target rather than a guaranteed ceiling, so keep your own limiter for contractual limits. Edge rate rules work per IP, the Cloudflare-style first line.</span></div>
+    <div><b>Autoscaling</b><span>Autoscaling changes N under you. Any per-server limit has to be derived from the maximum server count, or it silently grows the effective limit on every scale-out.</span></div>
   </div>
 </section>
 
