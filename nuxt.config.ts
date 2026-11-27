@@ -10,6 +10,9 @@ export default defineNuxtConfig({
     kitApiKey: '', // NUXT_KIT_API_KEY
     kitFormId: '', // NUXT_KIT_FORM_ID
     buttondownApiKey: '', // NUXT_BUTTONDOWN_API_KEY
+    resendApiKey: '', // NUXT_RESEND_API_KEY: emails topic suggestions
+    suggestTo: '', // NUXT_SUGGEST_TO: address that receives suggestions
+    suggestFrom: '', // NUXT_SUGGEST_FROM: optional verified sender, e.g. "System Design Lab <lab@yourdomain.com>"
     public: {
       siteUrl: 'https://sdlab.vercel.app', // NUXT_PUBLIC_SITE_URL
     },
@@ -46,7 +49,7 @@ export default defineNuxtConfig({
     replace: { __VUE_OPTIONS_API__: 'true' },
     prerender: {
       crawlLinks: true,
-      routes: ['/', '/labs', '/articles', '/about', '/rss.xml', '/sitemap.xml', '/robots.txt'],
+      routes: ['/', '/labs', '/articles', '/about', '/suggest', '/rss.xml', '/sitemap.xml', '/robots.txt'],
     },
   },
 
