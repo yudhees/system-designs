@@ -13,6 +13,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 const hits = new Map<string, { n: number, reset: number }>()
 function limited(ip: string) {
   const now = Date.now()
+  if (hits.size > 5000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k)
   const h = hits.get(ip)
   if (!h || h.reset < now) { hits.set(ip, { n: 1, reset: now + 60_000 }); return false }
   h.n++
@@ -22,6 +23,8 @@ function limited(ip: string) {
 export default defineEventHandler(async (event) => {
   const body = await readBody<{ email?: string, company?: string, source?: string }>(event).catch(() => ({} as any))
   const email = String(body?.email || '').trim().toLowerCase()
+  // Only used as a referrer tag in Kit; keep it to a short slug.
+  const source = String(body?.source || 'site').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 80) || 'site'
 
   // Bots fill the hidden field. Pretend it worked.
   if (body?.company) return { ok: true, message: 'Check your inbox to confirm your subscription.' }
@@ -43,14 +46,14 @@ export default defineEventHandler(async (event) => {
       await $fetch('https://api.kit.com/v4/subscribers', { method: 'POST', headers, body: { email_address: email, state: 'inactive' } })
       // 2) Add them to the form. Kit sends the form's confirmation email when double opt-in is on.
       await $fetch(`https://api.kit.com/v4/forms/${encodeURIComponent(String(cfg.kitFormId))}/subscribers`, {
-        method: 'POST', headers, body: { email_address: email, referrer: `${cfg.public.siteUrl}/?src=${encodeURIComponent(body?.source || 'site')}` },
+        method: 'POST', headers, body: { email_address: email, referrer: `${cfg.public.siteUrl}/?src=${encodeURIComponent(source)}` },
       })
     } else if (provider === 'buttondown') {
       if (!cfg.buttondownApiKey) throw new NotConfigured()
       await $fetch('https://api.buttondown.com/v1/subscribers', {
         method: 'POST',
         headers: { Authorization: `Token ${cfg.buttondownApiKey}`, 'Content-Type': 'application/json' },
-        body: { email_address: email, tags: ['website', body?.source || 'site'] },
+        body: { email_address: email, tags: ['website', source] },
       }).catch((e: any) => {
         // Already subscribed is fine.
         if (e?.status === 400 && JSON.stringify(e?.data || '').includes('already')) return

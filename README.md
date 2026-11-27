@@ -45,14 +45,33 @@ It skips a PR that is a draft, has the `no-automerge` label, or got new commits 
 
 ## Newsletter
 
-`POST /api/subscribe` adds an email to the provider set by `NUXT_NEWSLETTER_PROVIDER`:
+Kit (formerly ConvertKit) stores the subscriber list and sends the emails. Its free plan covers up to 10,000 subscribers, unlimited broadcasts and API access. `POST /api/subscribe` (used by every newsletter form on the site) validates the address, drops bots that fill a hidden honeypot field, limits each IP to 5 tries a minute, then adds the address to a Kit form. No keys live in the repository; they come from Vercel environment variables.
 
-- **Kit** (recommended): free up to 10,000 subscribers, API included. Create a form in Kit, turn on double opt-in for it, then set `NUXT_KIT_API_KEY` (v4 key) and `NUXT_KIT_FORM_ID` in Vercel. New subscribers are created as inactive and added to the form, so Kit's confirmation email decides when they're active.
-- **Buttondown**: free up to 100 subscribers. Set `NUXT_BUTTONDOWN_API_KEY`.
+### Setup in Kit
 
-Until keys are set, the form shows "Subscriptions open soon".
+1. Sign up at kit.com on the free plan.
+2. Grow → Landing Pages & Forms → Create new → Form (any style; it's only used as the signup source). Name it e.g. "Website".
+3. In the form's Settings → Incentive, keep "Send incentive email" on. That's the double opt-in confirmation, so nobody is mailed before they confirm.
+4. The form ID is the number in the form's URL (`app.kit.com/forms/designers/<ID>/edit`).
+5. Settings → Developer → API keys (v4) → Add a new key.
 
-To announce each new lab automatically, add a `KIT_API_KEY` repository secret. Broadcasts are saved as **drafts** in Kit by default; set the repository variable `KIT_BROADCAST_MODE=send` to send them automatically, and `SITE_URL` to your domain.
+### Vercel environment variables (Production)
+
+- `NUXT_KIT_API_KEY`: the v4 API key.
+- `NUXT_KIT_FORM_ID`: the form ID.
+- `NUXT_NEWSLETTER_PROVIDER`: optional, defaults to `kit`.
+
+Redeploy afterwards (Deployments → latest → Redeploy); environment variables only apply to new deployments. Until both are set, the form answers "Subscriptions open soon".
+
+Buttondown also works (`NUXT_NEWSLETTER_PROVIDER=buttondown`, `NUXT_BUTTONDOWN_API_KEY`), but its free plan stops at 100 subscribers.
+
+### Emailing each new lab
+
+Kit's "RSS campaigns" (RSS-to-email) are a paid Creator feature, so on the free plan the "Publish lesson" workflow creates the email itself through Kit's broadcast API (`scripts/kit-broadcast.mjs`) after it publishes a lesson.
+
+1. GitHub repo → Settings → Secrets and variables → Actions → New repository secret `KIT_API_KEY` (the same v4 key).
+2. Start in draft mode: each new lab appears in Kit → Send → Broadcasts as a draft you review and send.
+3. When the drafts look right, add the repository variable `KIT_BROADCAST_MODE=send` and each lab is sent to all subscribers automatically, about 5 minutes after it's published.
 
 ## Topic suggestions
 
