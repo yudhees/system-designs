@@ -55,13 +55,15 @@ Kit (formerly ConvertKit) stores the subscriber list and sends the emails. Its f
 4. The form ID is the number in the form's URL (`app.kit.com/forms/designers/<ID>/edit`).
 5. Settings → Developer → API keys (v4) → Add a new key.
 
+**Form is optional.** With only `NUXT_KIT_API_KEY` set, the route adds the address straight to Kit as an active subscriber (no confirmation email, so nobody is double-checked). Set `NUXT_KIT_FORM_ID` as well to get Kit's double opt-in confirmation email.
+
 ### Vercel environment variables (Production)
 
 - `NUXT_KIT_API_KEY`: the v4 API key.
-- `NUXT_KIT_FORM_ID`: the form ID.
+- `NUXT_KIT_FORM_ID`: optional, the form ID (turns on the confirmation email).
 - `NUXT_NEWSLETTER_PROVIDER`: optional, defaults to `kit`.
 
-Redeploy afterwards (Deployments → latest → Redeploy); environment variables only apply to new deployments. Until both are set, the form answers "Subscriptions open soon".
+Redeploy afterwards (Deployments → latest → Redeploy); environment variables only apply to new deployments. Until the API key is set, the form answers "Subscriptions open soon".
 
 Buttondown also works (`NUXT_NEWSLETTER_PROVIDER=buttondown`, `NUXT_BUTTONDOWN_API_KEY`), but its free plan stops at 100 subscribers.
 

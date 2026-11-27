@@ -40,14 +40,20 @@ export default defineEventHandler(async (event) => {
 
   try {
     if (provider === 'kit') {
-      if (!cfg.kitApiKey || !cfg.kitFormId) throw new NotConfigured()
+      if (!cfg.kitApiKey) throw new NotConfigured()
       const headers = { 'X-Kit-Api-Key': String(cfg.kitApiKey), 'Content-Type': 'application/json', Accept: 'application/json' }
-      // 1) Create (or find) the subscriber as inactive, so they're not mailed until they confirm.
-      await $fetch('https://api.kit.com/v4/subscribers', { method: 'POST', headers, body: { email_address: email, state: 'inactive' } })
-      // 2) Add them to the form. Kit sends the form's confirmation email when double opt-in is on.
-      await $fetch(`https://api.kit.com/v4/forms/${encodeURIComponent(String(cfg.kitFormId))}/subscribers`, {
-        method: 'POST', headers, body: { email_address: email, referrer: `${cfg.public.siteUrl}/?src=${encodeURIComponent(source)}` },
-      })
+      if (cfg.kitFormId) {
+        // With a Kit form: create the subscriber as inactive, then add them to the form.
+        // Kit sends the form's confirmation email (double opt-in) when that is turned on.
+        await $fetch('https://api.kit.com/v4/subscribers', { method: 'POST', headers, body: { email_address: email, state: 'inactive' } })
+        await $fetch(`https://api.kit.com/v4/forms/${encodeURIComponent(String(cfg.kitFormId))}/subscribers`, {
+          method: 'POST', headers, body: { email_address: email, referrer: `${cfg.public.siteUrl}/?src=${encodeURIComponent(source)}` },
+        })
+        return { ok: true, message: 'Almost done. Check your inbox and confirm your subscription.' }
+      }
+      // No form: add the subscriber directly (active, no confirmation email). Upsert, so repeats are fine.
+      await $fetch('https://api.kit.com/v4/subscribers', { method: 'POST', headers, body: { email_address: email, state: 'active' } })
+      return { ok: true, message: "You're subscribed. A new lab will land in your inbox most mornings." }
     } else if (provider === 'buttondown') {
       if (!cfg.buttondownApiKey) throw new NotConfigured()
       await $fetch('https://api.buttondown.com/v1/subscribers', {
