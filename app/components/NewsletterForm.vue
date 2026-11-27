@@ -53,4 +53,6 @@ input[aria-invalid=true] { border-color: var(--bad); }
 .msg.done { color: var(--ok); font-weight: 600; font-size: 1rem; }
 .msg.error { color: var(--bad); }
 @media (max-width: 480px) { .row { flex-direction: column; } .row .btn { width: 100%; } }
+.compact .row { flex-direction: column; }
+.compact .row .btn { width: 100%; }
 </style>
