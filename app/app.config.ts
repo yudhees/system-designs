@@ -14,6 +14,5 @@ export default defineAppConfig({
     x: '',
     website: '',
     summary: 'Full stack engineer building web products end to end, from APIs and data stores to the interfaces people use. I created System Design Lab to make the ideas behind reliable, scalable systems free and practical for every engineer.',
-    stack: ['PHP', 'Laravel', 'Node.js', 'Vue.js', 'MongoDB', 'Kafka', 'AWS'],
   },
 })

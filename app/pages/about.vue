@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { lessons } from '#content'
 const { author, site } = useAppConfig()
+const path = [...lessons].reverse()
 useSeoMeta({ title: 'About', description: `${author.name}, ${author.title}. ${author.summary}` })
 
 const strip = (u: string) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
@@ -43,11 +45,27 @@ const initials = author.name.slice(0, 1).toUpperCase()
           </ol>
         </section>
 
-        <section aria-labelledby="stack-h">
-          <h2 id="stack-h">Tech stack</h2>
-          <ul class="stack">
-            <li v-for="s in author.stack" :key="s">{{ s }}</li>
+        <section aria-labelledby="path-h">
+          <h2 id="path-h">A path through the labs</h2>
+          <p>New here? Start at the top and work down. The list grows every morning.</p>
+          <ol class="path">
+            <li v-for="l in path" :key="l.slug">
+              <NuxtLink :to="`/labs/${l.slug}`">{{ l.headline }}</NuxtLink>
+              <span class="topic"><i :style="{ background: topicColor(l.topic) }" />{{ l.topic }}</span>
+            </li>
+          </ol>
+        </section>
+
+        <section aria-labelledby="ask-h">
+          <h2 id="ask-h">Five questions behind every lab</h2>
+          <ul class="ask">
+            <li>What happens when this is ten times busier?</li>
+            <li>What happens when one part is slow, not dead?</li>
+            <li>What does a retry do to the system?</li>
+            <li>Which guarantee are we giving up, and on purpose?</li>
+            <li>How would we notice it is failing?</li>
           </ul>
+          <p>Keep these in your pocket. They turn most system design questions, in a design review or an interview, into something you can reason through.</p>
         </section>
 
         <section aria-labelledby="why-h">
@@ -95,8 +113,14 @@ const initials = author.name.slice(0, 1).toUpperCase()
 .how li { counter-increment: how; display: grid; grid-template-columns: 32px 1fr; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); color: var(--muted); }
 .how li::before { content: counter(how); font-family: var(--f-display); font-weight: 800; color: var(--signal); }
 .how b { color: var(--ink); font-weight: 600; }
-.stack { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.stack li { border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 12px; font-weight: 500; font-size: .95rem; background: var(--surface); }
+.path { margin: 0; padding: 0; list-style: none; counter-reset: path; display: grid; }
+.path li { counter-increment: path; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 0 12px 40px; border-top: 1px solid var(--line); position: relative; }
+.path li::before { content: counter(path); position: absolute; left: 0; font-family: var(--f-display); font-weight: 800; color: var(--signal); }
+.path a { font-weight: 600; }
+.path .topic { color: var(--muted); font-size: .85rem; display: inline-flex; align-items: center; gap: 6px; }
+.path .topic i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ask { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.ask li { border-left: 3px solid var(--signal); padding: 8px 14px; background: var(--surface); border-radius: 0 8px 8px 0; font-weight: 500; }
 .card { position: sticky; top: 88px; min-width: 0; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--r-lg); padding: 24px; display: grid; gap: 14px; }
 .card h2 { font-size: 1.2rem; }
 .card p { font-size: .95rem; }
