@@ -18,7 +18,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const scan = () => requestAnimationFrame(() => {
     const seen = new Map<Element, number>()
     document.querySelectorAll<HTMLElement>(SELECTOR).forEach((el) => {
-      if (el.classList.contains('rv') || el.closest('.hero')) return
+      if (el.classList.contains('rv') || el.closest('.hero, .bench')) return
       if (el.getBoundingClientRect().top < window.innerHeight * .92) return
       const n = seen.get(el.parentElement as Element) ?? 0
       seen.set(el.parentElement as Element, n + 1)
