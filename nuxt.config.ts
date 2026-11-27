@@ -14,7 +14,7 @@ export default defineNuxtConfig({
     suggestTo: '', // NUXT_SUGGEST_TO: address that receives suggestions
     suggestFrom: '', // NUXT_SUGGEST_FROM: optional verified sender, e.g. "System Design Lab <lab@yourdomain.com>"
     public: {
-      siteUrl: 'https://sdlab.vercel.app', // NUXT_PUBLIC_SITE_URL
+      siteUrl: 'https://sdl-daily.vercel.app', // NUXT_PUBLIC_SITE_URL
     },
   },
 
