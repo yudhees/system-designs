@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Creates a Kit broadcast announcing new lessons.
-// Usage: node scripts/kit-broadcast.mjs content/lessons/2026-11-27-foo.html [...]
+// Usage: node scripts/kit-broadcast.mjs app/labs/2026-11-27-foo.vue [...]  (older labs: content/lessons/*.html)
 // Env: KIT_API_KEY (required), SITE_URL, KIT_BROADCAST_MODE = "draft" (default) | "send"
 //   draft: saved in Kit for you to review and send.
 //   send:  scheduled two minutes from now, to all subscribers.
@@ -17,8 +17,8 @@ const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&
 
 for (const file of process.argv.slice(2)) {
   const html = readFileSync(file, 'utf8')
-  const slug = basename(file, '.html').replace(/^\d{4}-\d{2}-\d{2}-/, '')
-  const title = strip(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || slug).replace(/^System Design Lab\s*[—–-]\s*/i, '').replace(/\s*\(\d{4}-\d{2}-\d{2}\)$/, '')
+  const slug = basename(file).replace(/\.(html|vue)$/, '').replace(/^\d{4}-\d{2}-\d{2}-/, '')
+  const title = strip(html.match(/<!--\s*sdl:title:\s*([\s\S]*?)\s*-->/i)?.[1] || html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || slug).replace(/^System Design Lab\s*[—–-]\s*/i, '').replace(/\s*\(\d{4}-\d{2}-\d{2}\)$/, '')
   const headline = strip(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] || title)
   const lede = strip(html.match(/<p[^>]*class=["'][^"']*lede[^"']*["'][^>]*>([\s\S]*?)<\/p>/i)?.[1] || '')
   const url = `${site}/labs/${slug}?utm_source=newsletter`
