@@ -6,20 +6,14 @@ export default defineAppConfig({
   },
   author: {
     name: 'Yudhees',
-    title: 'Backend Engineer',
-    focus: 'Travel search and booking platforms',
+    title: 'Full Stack Engineer',
     // Leave a field empty to hide it on the About page.
     linkedin: 'https://www.linkedin.com/in/yudhees',
     email: '',
     github: 'https://github.com/yudhees',
     x: '',
     website: '',
-    summary: 'I design and build the backend systems behind hotel search and booking: integrations that fan out to many suppliers at once, price and availability caches that stay fast under load, and the event pipelines and webhooks that keep bookings consistent end to end.',
-    expertise: [
-      { title: 'Supplier integration', text: 'Parallel fan-out to third-party inventory APIs, with timeouts, rate limits and graceful degradation when a supplier is slow or down.' },
-      { title: 'Caching at scale', text: 'Price and availability caching tuned for freshness, hit rate and protection of upstream quotas.' },
-      { title: 'Event-driven systems', text: 'Queues, Kafka streams and webhook delivery built for retries, ordering and idempotent processing.' },
-    ],
+    summary: 'Full stack engineer building web products end to end, from APIs and data stores to the interfaces people use. I created System Design Lab to make the ideas behind reliable, scalable systems free and practical for every engineer.',
     stack: ['PHP', 'Laravel', 'Node.js', 'Vue.js', 'MongoDB', 'Kafka', 'AWS'],
   },
 })
