@@ -6,6 +6,7 @@ A free, public site for interactive system design labs: real incidents, the conc
 npm install
 npm run dev        # http://localhost:3000
 npm run build      # production build (prerenders every page)
+npm test           # Vitest suite (API routes, feeds, lesson data, workflow guards); runs in CI
 ```
 
 ## How content works
