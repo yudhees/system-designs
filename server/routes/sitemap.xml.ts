@@ -7,6 +7,7 @@ export default defineEventHandler((event) => {
     { loc: '/labs', lastmod: lessons[0]?.date },
     { loc: '/articles', lastmod: articles[0]?.date },
     { loc: '/about' },
+    { loc: '/suggest' },
     ...lessons.map(l => ({ loc: `/labs/${l.slug}`, lastmod: l.date })),
     ...articles.map(a => ({ loc: `/articles/${a.slug}`, lastmod: a.date })),
   ]

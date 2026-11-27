@@ -54,6 +54,18 @@ Until keys are set, the form shows "Subscriptions open soon".
 
 To announce each new lab automatically, add a `KIT_API_KEY` repository secret. Broadcasts are saved as **drafts** in Kit by default; set the repository variable `KIT_BROADCAST_MODE=send` to send them automatically, and `SITE_URL` to your domain.
 
+## Topic suggestions
+
+`/suggest` lets visitors propose a lab topic. `POST /api/suggest` emails each suggestion to the owner through [Resend](https://resend.com) (free: 3,000 emails a month). Spam guards: a hidden honeypot field, a minimum fill time, a link-count check and a per-IP limit of 3 per 10 minutes. If the visitor leaves an email, it's set as Reply-To so you can answer them directly.
+
+Set in Vercel:
+
+- `NUXT_RESEND_API_KEY`: Resend → API Keys → Create API key (sending access).
+- `NUXT_SUGGEST_TO`: the address that receives suggestions.
+- `NUXT_SUGGEST_FROM` (optional): leave empty to use Resend's test sender `onboarding@resend.dev`, which only delivers to the email your Resend account was created with. To deliver anywhere, verify a domain in Resend and set e.g. `System Design Lab <lab@yourdomain.com>`.
+
+Until the key and address are set, the form shows "Suggestions open soon".
+
 ## Deploying on Vercel
 
 1. vercel.com → Add New → Project → import `yudhees/system-designs`. Vercel detects Nuxt; keep the defaults.
