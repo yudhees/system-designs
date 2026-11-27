@@ -60,7 +60,9 @@ export function parseLesson(file: string, html: string): LessonMeta {
   // "System Design Lab — Consistent Hashing (2026-11-26)" -> "Consistent Hashing"
   const title = meta(html, 'title') || rawTitle.replace(/^System Design Lab\s*[—–-]\s*/i, '').replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/, '') || slug
   const headline = first(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i) || title
-  const summary = meta(html, 'summary') || first(html, /<p[^>]*class=["'][^"']*lede[^"']*["'][^>]*>([\s\S]*?)<\/p>/i)
+  const byClass = (c: string) => first(html, new RegExp(`<p[^>]*class=["'][^"']*\\b${c}\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/p>`, 'i'))
+  const afterH1 = first(html, /<\/h1>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i)
+  const summary = meta(html, 'summary') || byClass('lede') || byClass('hook') || afterH1
   // Eyebrow looks like "System Design Lab · 2026-11-26 · Partitioning"
   const eyebrow = first(html, /class=["'][^"']*eyebrow[^"']*["'][^>]*>([\s\S]*?)<\//i)
   const parts = eyebrow.split(/\s*[·|]\s*/)

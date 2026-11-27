@@ -1,0 +1,548 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>System Design Lab — Idempotency Keys (2026-11-27)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~720px) that widens to a two-lane lab for the simulation. Ledger/receipt motif: charges are chips, duplicates go red. */
+:root{
+  --bg:#F3F6F9; --surface:#FFFFFF; --sunk:#E8EDF2; --ink:#17212B; --muted:#586676; --line:#D7DEE6;
+  --accent:#0B7A84; --accent-soft:#D6EEF0; --dup:#C93B26; --dup-soft:#F9E0DB; --warn:#A87006; --warn-soft:#F6EBD2;
+  --replay:#5A4BC9; --replay-soft:#E5E2FA; --ok:#2A7F50; --ok-soft:#DDF0E5;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1318; --surface:#151C23; --sunk:#1C252E; --ink:#E5EBF1; --muted:#95A3B1; --line:#27323D;
+  --accent:#3DB8C3; --accent-soft:#163A3E; --dup:#FF6B55; --dup-soft:#43201B; --warn:#E3B04B; --warn-soft:#3A2F17;
+  --replay:#A396FF; --replay-soft:#2A2550; --ok:#52C68B; --ok-soft:#173727; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1318; --surface:#151C23; --sunk:#1C252E; --ink:#E5EBF1; --muted:#95A3B1; --line:#27323D;
+  --accent:#3DB8C3; --accent-soft:#163A3E; --dup:#FF6B55; --dup-soft:#43201B; --warn:#E3B04B; --warn-soft:#3A2F17;
+  --replay:#A396FF; --replay-soft:#2A2550; --ok:#52C68B; --ok-soft:#173727; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:0 64px}
+.wrap{max-width:760px;margin:0 auto}
+.wide{max-width:1080px;margin:0 auto}
+h1,h2,h3{font-family:var(--f-display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,5vw,3rem);font-weight:800;letter-spacing:-.02em}
+h2{font-size:1.6rem;font-weight:800;letter-spacing:-.01em}
+h3{font-size:1.1rem;font-weight:600}
+p{margin:0}
+a{color:var(--accent)}
+code,.mono{font-family:var(--f-mono);font-size:.88em}
+code{background:var(--sunk);padding:.1em .35em;border-radius:4px}
+section{display:grid;gap:16px;padding-block:40px;border-top:1px solid var(--line)}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.lead{font-size:1.1rem;color:var(--muted)}
+ul{margin:0;padding-left:1.2em;display:grid;gap:6px}
+
+header{padding-block:48px 32px;display:grid;gap:18px}
+.hook{font-family:var(--f-mono);font-size:.95rem;color:var(--muted);border-left:3px solid var(--dup);padding-left:12px}
+.tldr{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:grid;gap:6px}
+.tldr b.tag{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;color:var(--accent)}
+
+.callout{border-radius:8px;padding:14px 16px;display:grid;gap:4px;font-size:.95rem}
+.callout .tag{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:500}
+.c-key{background:var(--accent-soft)} .c-key .tag{color:var(--accent)}
+.c-gotcha{background:var(--warn-soft)} .c-gotcha .tag{color:var(--warn)}
+.c-num{background:var(--replay-soft)} .c-num .tag{color:var(--replay)}
+
+/* Story timeline */
+.story{display:grid;gap:0;border-left:2px solid var(--line);margin-left:6px}
+.beat{position:relative;padding:0 0 18px 20px;display:grid;gap:4px}
+.beat::before{content:"";position:absolute;left:-7px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+.beat .lbl{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* analogy */
+.analogy{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:6px;min-width:0}
+.tile .t{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:.92rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--sunk)}
+tr:last-child td{border-bottom:0}
+.bad{color:var(--dup);font-weight:600} .good{color:var(--ok);font-weight:600} .meh{color:var(--warn);font-weight:600}
+
+/* Lab */
+.lab{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:18px}
+.goal{font-size:1.05rem}
+.goal b{color:var(--accent)}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px;align-items:end}
+.ctl{display:grid;gap:4px;min-width:0}
+.ctl label{font-size:.88rem;font-weight:500;display:flex;justify-content:space-between;gap:8px}
+.ctl label output{font-family:var(--f-mono);color:var(--accent)}
+.ctl small{color:var(--muted);font-size:.8rem;line-height:1.35}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.ctl label.switch{display:flex;justify-content:flex-start;align-items:center;gap:10px;font-size:.9rem;font-weight:500;cursor:pointer}
+.switch input{width:18px;height:18px;accent-color:var(--accent)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;font-size:.92rem;font-weight:600;border-radius:8px;padding:9px 14px;cursor:pointer;border:1px solid var(--line);background:var(--sunk);color:var(--ink)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lanes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.lanes{grid-template-columns:1fr}}
+.lane{border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;min-width:0;background:var(--bg)}
+.lane-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.lane-head h3{font-size:1.05rem}
+.pill{font-family:var(--f-mono);font-size:.72rem;padding:2px 8px;border-radius:99px}
+.pill.naive{background:var(--dup-soft);color:var(--dup)} .pill.safe{background:var(--ok-soft);color:var(--ok)}
+canvas{width:100%;height:160px;display:block;border-radius:6px;background:var(--surface)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:grid;gap:0;min-width:0}
+.stat .v{font-family:var(--f-mono);font-size:1.25rem;font-weight:500;font-variant-numeric:tabular-nums}
+.stat .k{font-size:.74rem;color:var(--muted);line-height:1.25}
+.stat.alert .v{color:var(--dup)}
+.stat.alert{border-color:var(--dup)}
+.ledger{display:flex;flex-wrap:wrap;gap:4px;min-height:30px;align-content:flex-start;max-height:96px;overflow:hidden}
+.chip{font-family:var(--f-mono);font-size:.72rem;padding:2px 6px;border-radius:4px;background:var(--ok-soft);color:var(--ok)}
+.chip.dup{background:var(--dup-soft);color:var(--dup);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.8rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.money{font-size:.9rem;color:var(--muted)}
+.money b{color:var(--dup);font-family:var(--f-mono)}
+.try{display:grid;gap:10px}
+.try ol{margin:0;padding-left:1.3em;display:grid;gap:8px}
+.try li::marker{font-family:var(--f-mono);color:var(--accent);font-weight:600}
+
+details{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 16px}
+details[open]{padding-bottom:16px}
+summary{cursor:pointer;font-weight:600}
+details > div{margin-top:10px;display:grid;gap:10px}
+.scenario{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:10px}
+.stack{display:grid;gap:10px}
+.stack .row{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.stack .row:last-child{border-bottom:0}
+.stack .row b{font-family:var(--f-mono);font-size:.85rem;color:var(--accent)}
+@media (max-width:520px){.stack .row{grid-template-columns:1fr;gap:2px}}
+.recap{background:var(--ink);color:var(--bg);border-radius:12px;padding:22px;display:grid;gap:12px}
+.recap h2{color:var(--bg)}
+.recap code{background:transparent;color:inherit;border:1px solid currentColor}
+.sources li{font-size:.92rem}
+.flow{overflow-x:auto}
+.flow svg{display:block;min-width:600px;width:100%;height:auto}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">System Design Lab · 27 Nov 2026 · Idempotency</div>
+  <h1>Retry without paying twice</h1>
+  <p class="hook">Your API charged the guest's card. The response died on the way back. The app retries. Did the guest just pay for two rooms?</p>
+  <div class="tldr">
+    <b class="tag">TL;DR</b>
+    <p>Networks lose responses, so clients must retry. Retrying is only safe if the server can tell "this is the same request again" from "this is a new request".</p>
+    <p>The client sends a unique <b>idempotency key</b> with each operation. The server claims the key and the work <b>atomically</b>, saves the result, and replays that result for every retry.</p>
+  </div>
+</header>
+
+<section>
+  <div class="eyebrow">The real-world problem</div>
+  <h2>Airbnb's payments split into services, and retries got dangerous</h2>
+  <div class="story">
+    <div class="beat"><span class="lbl">What happened</span><p>Airbnb was moving payments from a monolith to a service-oriented architecture (SOA). Every payment now crossed several network hops, and each hop could time out.</p></div>
+    <div class="beat"><span class="lbl">What broke</span><p>A timed-out call is ambiguous. The charge may or may not have happened. Retrying blindly risks a double payment, and not retrying risks a lost one. Airbnb said they "couldn't compromise on data consistency".</p></div>
+    <div class="beat"><span class="lbl">What they changed</span><p>They built <b>Orpheus</b>, one shared idempotency library. Every request runs in three phases: <b>Pre-RPC</b> (record the request in the DB), <b>RPC</b> (the network call only), <b>Post-RPC</b> (record the response). There is no network call inside a DB phase and no DB work inside the RPC phase.</p></div>
+    <div class="beat"><span class="lbl">What improved</span><p>Airbnb reported <b>five nines in consistency</b> for payments, <b>while annual payment volume doubled</b>.</p></div>
+  </div>
+  <div class="callout c-num"><span class="tag">Real numbers · Stripe API v1</span>
+    <p>Keys are up to <b>255 characters</b>. Stripe saves the status code and body of the first request, <b>including 500 errors</b>, and replays it. Keys can be pruned once they are <b>at least 24 hours old</b>. After that, the same key creates a new request.</p></div>
+</section>
+
+<section>
+  <div class="eyebrow">The concept</div>
+  <h2>A cloakroom ticket for your request</h2>
+  <div class="analogy">
+    <div class="tile"><span class="t">Without a ticket</span><p>You hand over your coat. The attendant turns away, and you aren't sure they took it, so you hand over a second coat. Now two coats are hanging under your name.</p></div>
+    <div class="tile"><span class="t">With a ticket</span><p>You write ticket <code>#A7</code> first. If you are unsure, ask again with <code>#A7</code>. The attendant says "#A7 is already hanging" and hands you the same receipt.</p></div>
+  </div>
+  <ul>
+    <li><b>Idempotent</b>: doing it once or ten times leaves the same state. <code>GET</code> and <code>DELETE</code> already behave this way. <code>POST /bookings</code> does not.</li>
+    <li><b>Idempotency key</b>: a random ID the <i>client</i> creates once per intent (Stripe suggests a V4 UUID) and resends unchanged on every retry.</li>
+    <li><b>Claim</b>: the server's atomic "insert this key or tell me it exists", usually a unique index.</li>
+  </ul>
+
+  <h3>The three ways a call fails (Stripe's list)</h3>
+  <div class="flow" role="img" aria-label="Three failure points: before reaching the server, during processing, after completion when the response is lost">
+  <svg viewBox="0 0 640 150">
+    <rect x="10" y="45" width="90" height="50" rx="8" fill="var(--sunk)" stroke="var(--line)"/>
+    <text x="55" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="13">client</text>
+    <rect x="270" y="45" width="110" height="50" rx="8" fill="var(--sunk)" stroke="var(--line)"/>
+    <text x="325" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="13">server</text>
+    <rect x="540" y="45" width="90" height="50" rx="8" fill="var(--sunk)" stroke="var(--line)"/>
+    <text x="585" y="75" text-anchor="middle" fill="var(--ink)" font-family="IBM Plex Mono, monospace" font-size="13">payments</text>
+    <line x1="100" y1="60" x2="270" y2="60" stroke="var(--accent)" stroke-width="2"/>
+    <line x1="380" y1="70" x2="540" y2="70" stroke="var(--accent)" stroke-width="2"/>
+    <line x1="270" y1="82" x2="100" y2="82" stroke="var(--dup)" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="185" y="34" text-anchor="middle" fill="var(--ok)" font-family="IBM Plex Sans, sans-serif" font-size="12">① before connect: safe to retry</text>
+    <text x="460" y="34" text-anchor="middle" fill="var(--warn)" font-family="IBM Plex Sans, sans-serif" font-size="12">② mid-processing: work in limbo</text>
+    <text x="185" y="118" text-anchor="middle" fill="var(--dup)" font-family="IBM Plex Sans, sans-serif" font-size="12">③ after completion: response lost</text>
+    <text x="185" y="136" text-anchor="middle" fill="var(--muted)" font-family="IBM Plex Sans, sans-serif" font-size="11">client can't tell ③ from ①</text>
+  </svg></div>
+
+  <div class="callout c-key"><span class="tag">Key idea</span>
+    <p>Recording the key and doing the work must succeed or fail <b>together</b>. AWS says this must be an ACID operation. Otherwise you get a key with no booking, or a booking with no key.</p></div>
+
+  <div class="tablebox"><table>
+    <thead><tr><th>Design</th><th>Lost response</th><th>Double-tap / parallel retry</th><th>Crash mid-request</th></tr></thead>
+    <tbody>
+      <tr><td><b>Naive retry</b><br><small>no key</small></td><td class="bad">Charges again</td><td class="bad">Charges twice</td><td class="bad">Unknown state</td></tr>
+      <tr><td><b>Key, check-then-insert</b><br><small>SELECT, do the work, INSERT the key at the end</small></td><td class="good">Replays</td><td class="bad">Both pass the check, so it charges twice</td><td class="meh">Work done, key missing</td></tr>
+      <tr><td><b>Key, atomic claim + stored response</b><br><small>unique insert first, replay the saved result</small></td><td class="good">Replays</td><td class="good">Second request gets 409</td><td class="meh">Needs lease expiry + recovery</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout c-gotcha"><span class="tag">Gotchas</span>
+    <ul>
+      <li><b>Same key, different body.</b> AWS returns a parameter-mismatch validation error. Brandur's Postgres design returns <code>409</code>. Never replay a response for a different request.</li>
+      <li><b>A stuck "in progress" key.</b> If the server dies mid-request, the key stays locked. Orpheus gives each lease an expiry, so a retry is allowed only after the lease runs out.</li>
+      <li><b>Replica lag.</b> Orpheus always reads idempotency rows from the <b>primary</b>. A replica may not have the first response yet.</li>
+      <li><b>Downstream calls.</b> A charge to Stripe or a supplier is a "foreign state mutation" that you can't roll back. Give it its own derived key.</li>
+    </ul></div>
+</section>
+</div>
+
+<section class="wide" id="lab">
+  <div class="wrap" style="display:grid;gap:10px">
+    <div class="eyebrow">Interactive lab</div>
+    <h2>Break the booking API</h2>
+  </div>
+  <div class="lab">
+    <p class="goal"><b>Try this:</b> send the same bookings through both APIs, drop responses, and watch which ledger fills with red duplicate charges.</p>
+    <div class="controls">
+      <div class="ctl"><label for="loss">Responses lost <output id="lossOut">25%</output></label>
+        <input type="range" id="loss" min="0" max="60" step="5" value="25"><small>The server finishes, but the reply never arrives (failure ③).</small></div>
+      <div class="ctl"><label for="retries">Max client retries <output id="retriesOut">3</output></label>
+        <input type="range" id="retries" min="0" max="5" step="1" value="3"><small>Exponential backoff with jitter, same seed for both lanes.</small></div>
+      <div class="ctl"><label class="switch" for="dbl"><input type="checkbox" id="dbl"> Guest double-taps "Book"</label>
+        <small>Each booking fires two requests 0.13 s apart, carrying the same key.</small></div>
+      <div class="ctl"><label class="switch" for="atomic"><input type="checkbox" id="atomic" checked> Atomic key claim (right lane)</label>
+        <small>Off = SELECT first, INSERT the key after the work.</small></div>
+    </div>
+    <div class="btns">
+      <button class="primary" id="one">Book 1 room</button>
+      <button id="burst">Burst of 10</button>
+      <button id="auto" aria-pressed="false">Steady traffic: off</button>
+      <button id="reset">Reset</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>request</span>
+      <span><i style="background:var(--ok)"></i>fresh response</span>
+      <span><i style="background:var(--replay)"></i>replayed response</span>
+      <span><i style="background:var(--warn)"></i>409 in progress</span>
+      <span><i style="background:var(--dup)"></i>lost / duplicate</span>
+    </div>
+    <div class="lanes">
+      <div class="lane" id="laneNaive">
+        <div class="lane-head"><h3>Naive <code>POST /bookings</code></h3><span class="pill naive">no key</span></div>
+        <canvas id="cvNaive" aria-label="Animation of requests to the naive API"></canvas>
+        <div class="stats" data-stats></div>
+        <p class="money" data-money></p>
+        <div class="ledger" data-ledger aria-label="Payment ledger"></div>
+      </div>
+      <div class="lane" id="laneKey">
+        <div class="lane-head"><h3>With <code>Idempotency-Key</code></h3><span class="pill safe" id="keyPill">atomic claim</span></div>
+        <canvas id="cvKey" aria-label="Animation of requests to the idempotent API"></canvas>
+        <div class="stats" data-stats></div>
+        <p class="money" data-money></p>
+        <div class="ledger" data-ledger aria-label="Payment ledger"></div>
+      </div>
+    </div>
+    <div class="try">
+      <h3>Try this</h3>
+      <ol>
+        <li>Leave losses at 25% and hit <b>Burst of 10</b>. The left ledger turns red. The right lane serves purple <b>replays</b> instead.</li>
+        <li>Turn on <b>double-tap</b>, then switch <b>Atomic key claim</b> off and burst again. Duplicates appear on the right too: both taps read "no key yet" before either one saves it. The key alone isn't the fix. The atomic claim is.</li>
+        <li>Turn double-tap off and set <b>Max retries to 0</b>. Duplicates vanish on the left, but "charged, guest saw error" climbs. You can't avoid retries. You can only make them safe.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+<section>
+  <div class="eyebrow">Solve it</div>
+  <h2>One booking, four ways to duplicate it</h2>
+  <div class="scenario">
+    <p><b>Scenario.</b> A guest books a hotel room through your meta-search checkout. Your API (1) charges the card with the PSP, (2) calls the supplier's booking API, and (3) publishes <code>booking.confirmed</code> to Kafka for emails and invoices.</p>
+    <p>The supplier API has <b>no idempotency support</b> and sometimes times out after it has already booked the room. The mobile app retries on timeouts. Fargate tasks get stopped during deploys.</p>
+    <p><b>Design it so that no guest is charged twice, no room is booked twice, and no confirmation email goes out twice.</b></p>
+  </div>
+  <details><summary>Hint 1: where does the key come from?</summary><div><p>Generate it on the device when the checkout screen opens, not per HTTP attempt. A double-tap and a retry must carry the same key.</p></div></details>
+  <details><summary>Hint 2: the supplier can't dedupe for you</summary><div><p>Send the supplier your own unique reference. After a timeout, look the booking up before you retry.</p></div></details>
+  <details><summary>Hint 3: think in phases</summary><div><p>Each external call is its own step. Save a recovery point after every one, so a restarted task knows where to resume.</p></div></details>
+  <details><summary><b>Reveal the model answer</b></summary><div>
+    <ul>
+      <li><b>Client</b>: UUID v4 per checkout, sent as <code>Idempotency-Key</code>. Retry with exponential backoff + jitter.</li>
+      <li><b>Claim</b>: insert <code>{userId, key, requestHash, status: started, lockedUntil}</code> under a unique index on <code>(userId, key)</code>, in the same transaction that creates the pending booking.</li>
+      <li><b>Existing key</b>: finished with the same hash → replay the stored code and body. Lease still active → <code>409</code> + <code>Retry-After</code>. Different hash → reject as a mismatch.</li>
+      <li><b>PSP charge</b>: pass a derived key such as <code>booking-{id}-charge</code>, so the PSP dedupes your own retries. Save <code>recovery_point = charged</code>.</li>
+      <li><b>Supplier</b>: send <code>clientRef = booking-{id}</code>. On timeout, mark the booking <i>unknown</i>, then retrieve by reference before re-booking. Never retry blindly.</li>
+      <li><b>Kafka</b>: write <code>booking.confirmed</code> to an outbox in the final transaction. The email consumer dedupes on event ID with a unique index, because redelivery will happen.</li>
+      <li><b>Recovery</b>: a completer job picks up keys whose lease expired mid-flow and resumes from <code>recovery_point</code>. A reaper deletes keys after ~24–72 h.</li>
+      <li><b>Reads</b>: read key rows from the primary, never a lagging replica.</li>
+    </ul></div></details>
+</section>
+
+<section>
+  <div class="eyebrow">Apply to your stack</div>
+  <h2>Where this lives in your code</h2>
+  <div class="stack">
+    <div class="row"><b>Laravel</b><p>Write an <code>Idempotency</code> middleware that claims the key inside <code>DB::transaction</code>, stores the response after the controller runs, and replays it on a repeat. <code>Cache::lock</code> alone can expire mid-request, so the stored row is the real guard.</p></div>
+    <div class="row"><b>Node.js</b><p>The same middleware in Express or Fastify. Call <code>insertOne</code> and treat duplicate-key error <code>E11000</code> as "this key already exists", then branch on its status.</p></div>
+    <div class="row"><b>MongoDB</b><p>A unique compound index on <code>{userId, key}</code> is the atomic claim. A TTL index on <code>createdAt</code> is the reaper. Read with primary read preference.</p></div>
+    <div class="row"><b>Kafka</b><p>Producer idempotence only stops duplicate writes from producer retries. Consumers still see redelivered messages after rebalances, so keep a processed-event-ID table in the consumer.</p></div>
+    <div class="row"><b>AWS Fargate</b><p>Tasks stop during deploys and scale-in, so any request can die halfway. Lease expiry plus a scheduled completer task turns "stuck" into "resumed".</p></div>
+  </div>
+</section>
+
+<section style="border-top:0">
+  <div class="recap">
+    <h2>Remember this</h2>
+    <ul>
+      <li>A timeout means "unknown", not "failed". Retries are mandatory, so make them safe.</li>
+      <li>The client creates the key once per <b>intent</b> and resends it unchanged on every retry.</li>
+      <li>Claim the key <b>atomically</b> with the work, then store and replay the response, errors included.</li>
+      <li>External calls get derived keys or lookup-by-reference. Expire stuck leases and resume from recovery points.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Sources</div>
+  <ul class="sources">
+    <li><a href="https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb" target="_blank" rel="noopener">Avoiding Double Payments in a Distributed Payments System</a>: Airbnb Engineering, Jon Chew &amp; Ninad Khisti, 2019</li>
+    <li><a href="https://docs.stripe.com/api/idempotent_requests" target="_blank" rel="noopener">Idempotent requests</a>: Stripe API reference</li>
+    <li><a href="https://stripe.com/blog/idempotency" target="_blank" rel="noopener">Designing robust and predictable APIs with idempotency</a>: Stripe blog, Brandur Leach, 2017</li>
+    <li><a href="https://builder.aws.com/content/3Ev0BENTyBr0XxzRk5FDZzgNYos/making-retries-safe-with-idempotent-apis" target="_blank" rel="noopener">Making retries safe with idempotent APIs</a>: Amazon Builders' Library</li>
+    <li><a href="https://brandur.org/idempotency-keys" target="_blank" rel="noopener">Implementing Stripe-like Idempotency Keys in Postgres</a>: Brandur Leach</li>
+  </ul>
+</section>
+</div>
+
+<script>
+(() => {
+  const PRICE = 6500; // example nightly rate, simulation only
+  const T = { travel: 650, proc: 450, replay: 120, conflict: 80, timeout: 2200, backoff: 350 };
+  const $ = id => document.getElementById(id);
+  const cfg = { loss: .25, retries: 3, dbl: false, atomic: true };
+  let seed = 7, clock = 0, nextIntent = 1, auto = false, autoAcc = 0;
+
+  function rnd(a, b, c) {
+    let h = (a * 374761393 + b * 668265263 + c * 2246822519 + seed * 3266489917) | 0;
+    h = Math.imul(h ^ (h >>> 15), 2246822519); h = Math.imul(h ^ (h >>> 13), 3266489917); h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+
+  class Lane {
+    constructor(mode, rootId, canvasId) {
+      this.mode = mode; this.root = $(rootId); this.cv = $(canvasId); this.ctx = this.cv.getContext('2d');
+      this.statsEl = this.root.querySelector('[data-stats]'); this.moneyEl = this.root.querySelector('[data-money]');
+      this.ledgerEl = this.root.querySelector('[data-ledger]'); this.reset();
+    }
+    reset() {
+      this.q = []; this.packets = []; this.store = new Map(); this.charges = new Map(); this.intents = new Map();
+      this.answered = new Set(); this.flashes = []; this.inProc = 0;
+      this.s = { requested: 0, charged: 0, dup: 0, replays: 0, conflicts: 0, errCharged: 0 };
+      this.ledgerEl.innerHTML = ''; this.render();
+    }
+    at(t, fn) { this.q.push({ t, fn }); }
+    tick() {
+      this.q.sort((a, b) => a.t - b.t);
+      while (this.q.length && this.q[0].t <= clock) this.q.shift().fn();
+      this.packets = this.packets.filter(p => clock < p.t1 + (p.lost ? 700 : 0));
+      this.flashes = this.flashes.filter(f => clock < f.t + 400);
+    }
+    start(id) {
+      const chains = cfg.dbl ? 2 : 1;
+      this.intents.set(id, { done: false, gaveUp: 0, chains, failed: false });
+      this.s.requested++;
+      for (let c = 0; c < chains; c++) this.send(id, c, 0, clock + c * 130);
+      this.render();
+    }
+    send(id, c, a, t) {
+      this.at(t, () => {
+        if (this.intents.get(id).done) return;
+        this.packets.push({ kind: 'req', t0: clock, t1: clock + T.travel, retry: a > 0 });
+        this.at(clock + T.travel, () => this.arrive(id, c, a));
+        this.at(clock + T.timeout, () => {
+          const k = id + '.' + c + '.' + a;
+          if (!this.answered.has(k)) this.retry(id, c, a);
+        });
+      });
+    }
+    arrive(id, c, a) {
+      if (this.mode === 'naive') return this.work(id, c, a, false);
+      const rec = this.store.get(id);
+      if (cfg.atomic) {
+        if (rec && rec.status === 'done') { this.s.replays++; return this.at(clock + T.replay, () => this.respond(id, c, a, 'replay')); }
+        if (rec) { this.s.conflicts++; return this.at(clock + T.conflict, () => this.respond(id, c, a, '409')); }
+        this.store.set(id, { status: 'progress' });
+        return this.work(id, c, a, false);
+      }
+      // check-then-insert: the read happens now, the key is written only after the work
+      if (rec && rec.status === 'done') { this.s.replays++; return this.at(clock + T.replay, () => this.respond(id, c, a, 'replay')); }
+      this.work(id, c, a, true);
+    }
+    work(id, c, a, lateInsert) {
+      this.inProc++;
+      this.at(clock + T.proc, () => {
+        this.inProc--;
+        this.charge(id);
+        if (this.mode === 'key') this.store.set(id, { status: 'done' });
+        this.respond(id, c, a, 'ok');
+      });
+    }
+    charge(id) {
+      const n = (this.charges.get(id) || 0) + 1; this.charges.set(id, n);
+      this.s.charged++; if (n > 1) this.s.dup++;
+      this.flashes.push({ t: clock, dup: n > 1 });
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (n > 1 ? ' dup' : '');
+      chip.textContent = 'B' + id + (n > 1 ? ' ×' + n : '');
+      this.ledgerEl.prepend(chip);
+      while (this.ledgerEl.children.length > 48) this.ledgerEl.lastChild.remove();
+      this.recount(); this.render();
+    }
+    respond(id, c, a, kind) {
+      const lost = rnd(id, c, a) < cfg.loss;
+      this.packets.push({ kind, t0: clock, t1: clock + T.travel * (lost ? .5 : 1), lost });
+      if (lost) return;
+      this.at(clock + T.travel, () => {
+        this.answered.add(id + '.' + c + '.' + a);
+        const it = this.intents.get(id);
+        if (kind === '409') return this.retry(id, c, a);
+        if (!it.done) { it.done = true; it.failed = false; this.recount(); this.render(); }
+      });
+    }
+    retry(id, c, a) {
+      const it = this.intents.get(id); if (it.done) return;
+      if (a >= cfg.retries) {
+        it.gaveUp++;
+        if (it.gaveUp >= it.chains) { it.failed = true; this.recount(); this.render(); }
+        return;
+      }
+      const wait = T.backoff * Math.pow(2, a) * (0.5 + rnd(id, c, a + 97));
+      this.send(id, c, a + 1, clock + wait);
+    }
+    recount() {
+      let e = 0; for (const [id, it] of this.intents) if (it.failed && (this.charges.get(id) || 0) > 0) e++;
+      this.s.errCharged = e;
+    }
+    render() {
+      const s = this.s;
+      const rows = [
+        ['Bookings requested', s.requested], ['Rooms charged', s.charged], ['Duplicate charges', s.dup, s.dup > 0],
+        ['Replays served', s.replays], ['409 conflicts', s.conflicts], ['Charged, guest saw error', s.errCharged, s.errCharged > 0]
+      ];
+      this.statsEl.innerHTML = rows.map(([k, v, al]) => `<div class="stat${al ? ' alert' : ''}"><span class="v">${v}</span><span class="k">${k}</span></div>`).join('');
+      this.moneyEl.innerHTML = `Overcharged: <b>₹${(s.dup * PRICE).toLocaleString('en-IN')}</b> at an example rate of ₹${PRICE.toLocaleString('en-IN')}/night`;
+    }
+    draw(col) {
+      const cv = this.cv, ctx = this.ctx, dpr = window.devicePixelRatio || 1;
+      const w = cv.clientWidth, h = cv.clientHeight;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+      const bw = Math.min(84, w * .2), bh = 46;
+      const cx = 8, sx = w * .5 - bw / 2, px = w - bw - 8, by = 22;
+      const box = (x, label, sub, stroke) => {
+        ctx.fillStyle = col.sunk; ctx.strokeStyle = stroke || col.line; ctx.lineWidth = stroke ? 2 : 1;
+        ctx.beginPath(); ctx.roundRect(x, by, bw, bh, 7); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = col.ink; ctx.font = '600 12px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(label, x + bw / 2, by + 20);
+        ctx.fillStyle = col.muted; ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillText(sub, x + bw / 2, by + 36);
+      };
+      const flash = this.flashes.length ? (this.flashes[this.flashes.length - 1].dup ? col.dup : col.ok) : null;
+      box(cx, 'Guest app', 'retries', null);
+      box(sx, 'Booking API', this.inProc ? 'busy ' + this.inProc : 'idle', this.inProc ? col.accent : null);
+      box(px, 'Payments', '₹ × ' + this.s.charged, flash);
+      // key store
+      if (this.mode === 'key') {
+        ctx.fillStyle = col.surface; ctx.strokeStyle = col.line; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.roundRect(sx, by + bh + 50, bw, 34, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = col.muted; ctx.font = '11px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillText('keys: ' + this.store.size, sx + bw / 2, by + bh + 71);
+        ctx.strokeStyle = col.line; ctx.beginPath(); ctx.moveTo(sx + bw / 2, by + bh); ctx.lineTo(sx + bw / 2, by + bh + 50); ctx.stroke();
+      }
+      // tracks
+      const yReq = by + 10, yRes = by + bh - 10;
+      ctx.strokeStyle = col.line; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx + bw, yReq); ctx.lineTo(sx, yReq); ctx.moveTo(sx, yRes); ctx.lineTo(cx + bw, yRes);
+      ctx.moveTo(sx + bw, by + bh / 2); ctx.lineTo(px, by + bh / 2); ctx.stroke(); ctx.setLineDash([]);
+      const x0 = cx + bw + 4, x1 = sx - 4;
+      for (const p of this.packets) {
+        const dur = p.lost ? T.travel * .5 : T.travel;
+        const prog = Math.min(1, (clock - p.t0) / dur);
+        let x, y, c;
+        if (p.kind === 'req') { x = x0 + (x1 - x0) * prog; y = yReq; c = col.accent; }
+        else {
+          const frac = p.lost ? prog * .5 : prog; x = x1 - (x1 - x0) * frac; y = yRes;
+          c = p.kind === 'replay' ? col.replay : p.kind === '409' ? col.warn : col.ok;
+        }
+        if (p.lost && clock >= p.t1) {
+          const fade = 1 - Math.min(1, (clock - p.t1) / 700);
+          ctx.globalAlpha = fade; ctx.strokeStyle = col.dup; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + 6, y + 6); ctx.moveTo(x + 6, y - 6); ctx.lineTo(x - 6, y + 6); ctx.stroke();
+          ctx.globalAlpha = 1; continue;
+        }
+        ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, p.retry ? 6 : 5, 0, Math.PI * 2); ctx.fill();
+        if (p.retry) { ctx.strokeStyle = col.surface; ctx.lineWidth = 1.5; ctx.stroke(); }
+      }
+      for (const f of this.flashes) {
+        const pr = (clock - f.t) / 400; const x = sx + bw + (px - sx - bw) * pr;
+        ctx.fillStyle = f.dup ? col.dup : col.ok; ctx.beginPath(); ctx.arc(x, by + bh / 2, 4, 0, Math.PI * 2); ctx.fill();
+      }
+      // footer label
+      ctx.fillStyle = col.muted; ctx.font = '11px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('requests →', x0, by - 8);
+      ctx.fillText('← responses', x0, yRes + 22);
+    }
+  }
+
+  const lanes = [new Lane('naive', 'laneNaive', 'cvNaive'), new Lane('key', 'laneKey', 'cvKey')];
+  const book = () => { const id = nextIntent++; lanes.forEach(l => l.start(id)); };
+
+  function colors() {
+    const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue('--' + n).trim();
+    return { ink: g('ink'), muted: g('muted'), line: g('line'), sunk: g('sunk'), surface: g('surface'),
+      accent: g('accent'), ok: g('ok'), dup: g('dup'), warn: g('warn'), replay: g('replay') };
+  }
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(100, now - last); last = now; clock += dt;
+    if (auto) { autoAcc += dt; if (autoAcc >= 900) { autoAcc = 0; book(); } }
+    const col = colors();
+    lanes.forEach(l => { l.tick(); l.draw(col); });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  const bind = (id, out, fmt, set) => { const el = $(id); const f = () => { set(el); if (out) $(out).textContent = fmt(el.value); }; el.addEventListener('input', f); f(); };
+  bind('loss', 'lossOut', v => v + '%', el => cfg.loss = el.value / 100);
+  bind('retries', 'retriesOut', v => v, el => cfg.retries = +el.value);
+  $('dbl').addEventListener('change', e => cfg.dbl = e.target.checked);
+  $('atomic').addEventListener('change', e => {
+    cfg.atomic = e.target.checked;
+    const p = $('keyPill'); p.textContent = cfg.atomic ? 'atomic claim' : 'check-then-insert';
+    p.className = 'pill ' + (cfg.atomic ? 'safe' : 'naive');
+  });
+  $('one').addEventListener('click', book);
+  $('burst').addEventListener('click', () => { for (let i = 0; i < 10; i++) setTimeout(book, i * 160); });
+  $('auto').addEventListener('click', e => { auto = !auto; e.target.setAttribute('aria-pressed', auto); e.target.textContent = 'Steady traffic: ' + (auto ? 'on' : 'off'); });
+  $('reset').addEventListener('click', () => { seed++; nextIntent = 1; lanes.forEach(l => l.reset()); });
+
+  // open in a working state: a few sample bookings already in flight
+  for (let i = 0; i < 4; i++) setTimeout(book, 300 + i * 400);
+  window.__lab = { lanes, cfg, book };
+})();
+</script>
+
+</body></html>
