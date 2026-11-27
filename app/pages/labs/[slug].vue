@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Component } from 'vue'
 import { lessons } from '#content'
 const route = useRoute()
 const idx = lessons.findIndex(l => l.slug === route.params.slug)
@@ -16,14 +17,22 @@ useSeoMeta({
   ogDescription: lab.summary,
   ogType: 'article',
 })
-useHead({ link: [{ rel: 'preload', href: lab.file, as: 'document' }] })
+if (!lab.native) useHead({ link: [{ rel: 'preload', href: lab.file, as: 'document' }] })
 
-// The lab is a complete page with its own styles and scripts, so it runs in an
+// Native labs are Vue components in app/labs, rendered inline with the site's own styles and
+// tokens. They are loaded lazily and render on the server like any page; their simulators start
+// in the browser once mounted.
+const loaders = import.meta.glob('../../labs/*.vue')
+const LabBody = lab.native ? defineAsyncComponent(loaders[`../../labs/${lab.date}-${lab.slug}.vue`] as () => Promise<Component>) : null
+const labEl = ref<HTMLElement>()
+
+// Legacy labs are complete standalone pages, so they run in an
 // iframe (same origin). We size the frame to its content so the page scrolls
 // as one, and pass the site theme through.
 const frame = ref<HTMLIFrameElement>()
 const height = ref(1400)
 let ro: ResizeObserver | undefined
+let tocObserver: MutationObserver | undefined
 function syncTheme() {
   const doc = frame.value?.contentDocument
   if (!doc) return
@@ -52,10 +61,10 @@ const active = ref('')
 const progress = ref(0)
 const menu = ref<HTMLDetailsElement>()
 function buildToc() {
-  const doc = frame.value?.contentDocument
-  if (!doc) return
+  const root: ParentNode | undefined = lab.native ? labEl.value : frame.value?.contentDocument ?? undefined
+  if (!root) return
   const out: Sec[] = []
-  doc.querySelectorAll<HTMLElement>('body section').forEach((el, i) => {
+  root.querySelectorAll<HTMLElement>(lab.native ? 'section' : 'body section').forEach((el, i) => {
     const h = el.querySelector('h2')
     if (!h) return
     const eyebrow = el.querySelector('.eyebrow')?.textContent?.trim()
@@ -66,12 +75,18 @@ function buildToc() {
   secs.value = out
   spy()
 }
-function frameTop() { return (frame.value?.getBoundingClientRect().top ?? 0) }
+function frameTop() { return lab.native ? 0 : (frame.value?.getBoundingClientRect().top ?? 0) }
 function spy() {
   const ft = frameTop()
   let cur = ''
   for (const s of secs.value) if (ft + s.el.getBoundingClientRect().top <= 140) cur = s.id
   active.value = cur
+  if (lab.native) {
+    const r = labEl.value?.getBoundingClientRect()
+    const total = (r?.height ?? 0) - window.innerHeight
+    progress.value = r && total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 0
+    return
+  }
   const total = height.value - window.innerHeight
   progress.value = total > 0 ? Math.min(1, Math.max(0, -ft / total)) : 0
 }
@@ -80,8 +95,21 @@ function go(s: Sec) {
   window.scrollTo({ top: y, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
   if (menu.value) menu.value.open = false
 }
-onMounted(() => { window.addEventListener('scroll', spy, { passive: true }); window.addEventListener('resize', spy) })
-onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', spy); window.removeEventListener('resize', spy) })
+onMounted(() => {
+  window.addEventListener('scroll', spy, { passive: true }); window.addEventListener('resize', spy)
+  if (lab.native) {
+    // The lab body loads lazily; build the contents list once it has rendered.
+    const el = labEl.value
+    if (el) {
+      buildToc()
+      if (!secs.value.length) {
+        tocObserver = new MutationObserver(() => { buildToc(); if (secs.value.length) { tocObserver?.disconnect(); tocObserver = undefined } })
+        tocObserver.observe(el, { childList: true, subtree: true })
+      }
+    }
+  }
+})
+onBeforeUnmount(() => { ro?.disconnect(); tocObserver?.disconnect(); window.removeEventListener('scroll', spy); window.removeEventListener('resize', spy) })
 </script>
 
 <template>
@@ -109,8 +137,9 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
       </ol>
     </details>
 
-    <div class="stage wrap">
-      <iframe ref="frame" :src="lab.file" :title="`${lab.title} lab`" :style="{ height: `${height}px` }" class="frame" @load="onLoad" />
+    <div :class="['stage', 'wrap', { legacy: !lab.native }]">
+      <div v-if="LabBody" ref="labEl" class="native"><component :is="LabBody" /></div>
+      <iframe v-else ref="frame" :src="lab.file" :title="`${lab.title} lab`" :style="{ height: `${height}px` }" class="frame" @load="onLoad" />
       <aside v-if="secs.length" class="toc" aria-label="On this page">
         <p class="cap">On this page</p>
         <ol>
@@ -125,7 +154,7 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
         <ClientOnly>
           <button type="button" :class="['btn', isDone(lab.slug) ? '' : 'btn-primary']" @click="toggle(lab.slug)">{{ isDone(lab.slug) ? '✓ Marked as done' : 'Mark this lab as done' }}</button>
         </ClientOnly>
-        <a :href="lab.file" target="_blank" rel="noopener" class="muted">Open the lab on its own page</a>
+        <a v-if="!lab.native" :href="lab.file" target="_blank" rel="noopener" class="muted">Open the lab on its own page</a>
       </div>
 
       <nav class="pager" aria-label="More labs">
@@ -167,7 +196,8 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
 .progress i { transition: transform .12s linear; display: block; height: 100%; background: var(--signal); transform-origin: left; transform: scaleX(0); }
 .stage { display: block; }
 /* the lab document keeps its own 16px side padding, so trim the container's to line text up with the header */
-.stage { padding-inline: max(0px, calc(var(--gutter) - 16px)); }
+.stage.legacy { padding-inline: max(0px, calc(var(--gutter) - 16px)); }
+.native { min-width: 0; padding-bottom: 24px; }
 .toc, .mtoc { display: none; }
 .toc ol, .mtoc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .toc a, .mtoc a { transition: color .2s, border-color .2s, background-color .2s, padding-left .2s; display: block; padding: 7px 12px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; font-size: .92rem; }

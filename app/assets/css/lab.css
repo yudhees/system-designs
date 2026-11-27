@@ -1,0 +1,94 @@
+/*
+  Lab kit: the shared look for native labs (app/labs/*.vue).
+  A lab is a Vue component whose root is <div class="labdoc">. Everything here uses the site
+  tokens from main.css, so labs follow the same colors, fonts, light/dark theme and container.
+  Lab-specific widgets add their own scoped styles on top of these classes.
+*/
+:root {
+  --c-1: #4f46e5; --c-2: #d97706; --c-3: #15803d; --c-4: #9333ea; --c-5: #0e8f8a; --c-6: #be3a8f; --c-neutral: #8a8f9c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --c-1: #8b8cff; --c-2: #ffa95c; --c-3: #3fcf8e; --c-4: #c08bff; --c-5: #3fd0c9; --c-6: #f08ac8; --c-neutral: #7d8294; }
+}
+:root[data-theme="dark"] { --c-1: #8b8cff; --c-2: #ffa95c; --c-3: #3fcf8e; --c-4: #c08bff; --c-5: #3fd0c9; --c-6: #f08ac8; --c-neutral: #7d8294; }
+
+.labdoc { container-type: inline-size; display: flex; flex-direction: column; gap: 56px; padding-block: 8px 24px; min-width: 0; }
+.labdoc > *, .labdoc section > * { min-width: 0; }
+.labdoc h1, .labdoc h2, .labdoc h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.2; margin: 0; }
+.labdoc h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 700; letter-spacing: -.02em; }
+.labdoc h2 { font-size: 1.6rem; font-weight: 600; letter-spacing: -.01em; }
+.labdoc h3 { font-size: 1.1rem; font-weight: 600; }
+.labdoc p { margin: 0; max-width: 68ch; }
+.labdoc a { color: var(--signal); }
+.labdoc code, .labdoc .mono { font-family: var(--f-mono); font-size: max(14px, .9em); }
+.labdoc section { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 90px; }
+.labdoc header.hero { padding-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+.labdoc .eyebrow { font-family: var(--f-mono); font-size: .875rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.labdoc .lede { font-size: 1.15rem; color: var(--muted); max-width: 62ch; }
+.labdoc .hint, .labdoc .muted { color: var(--muted); font-size: .92rem; }
+
+.labdoc .formula, .labdoc pre.code { font-family: var(--f-mono); background: var(--sunk); border-radius: var(--r-sm); padding: 12px 14px; overflow-x: auto; font-size: .92rem; line-height: 1.5; margin: 0; }
+.labdoc .formula { white-space: pre; }
+
+.labdoc .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.labdoc .fact { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+.labdoc .fact .n { font-family: var(--f-display); font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.labdoc .fact .src { font-size: .875rem; color: var(--muted); font-family: var(--f-mono); }
+
+.labdoc .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 760px) { .labdoc .two { grid-template-columns: 1fr; } }
+
+.labdoc .tbl { overflow-x: auto; }
+.labdoc table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+.labdoc th, .labdoc td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.labdoc th { font-family: var(--f-mono); font-size: .875rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.labdoc .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+
+.labdoc .callout { background: var(--signal-soft); border-radius: var(--r-md); padding: 14px 16px; font-size: .95rem; }
+.labdoc .callout p { max-width: none; }
+
+/* Solve it */
+.labdoc .scenario { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.labdoc .scenario ul, .labdoc .answer ul, .labdoc .answer ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.labdoc details { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+.labdoc details + details { margin-top: -6px; }
+.labdoc details > summary { cursor: pointer; padding: 12px 16px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+.labdoc details > summary::-webkit-details-marker { display: none; }
+.labdoc details > summary::after { content: "+"; font-family: var(--f-mono); color: var(--muted); }
+.labdoc details[open] > summary::after { content: "−"; }
+.labdoc details > div { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+/* In practice, sources */
+.labdoc .stack { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.labdoc .stack > div { border-left: 2px solid var(--line); padding-left: 14px; display: flex; flex-direction: column; gap: 4px; font-size: .95rem; }
+.labdoc .stack b { font-family: var(--f-mono); font-size: .875rem; color: var(--signal); font-weight: 500; }
+.labdoc ol.sources { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: .95rem; }
+
+/* Simulator kit: controls | scope bench, stacks on phones */
+.labdoc .bench { display: grid; grid-template-columns: 290px 1fr; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.labdoc .bench > * { min-width: 0; }
+@container (max-width: 940px) { .labdoc .bench { grid-template-columns: 1fr; } }
+.labdoc .controls { padding: 18px; display: flex; flex-direction: column; gap: 16px; border-right: 1px solid var(--line); background: var(--sunk); }
+@container (max-width: 940px) { .labdoc .controls { border-right: 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 24px; } .labdoc .controls .btns { align-self: end; } }
+.labdoc .ctl { display: flex; flex-direction: column; gap: 6px; }
+.labdoc .ctl label, .labdoc .ctl .lbl { font-size: .9rem; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.labdoc .ctl output { font-family: var(--f-mono); font-weight: 500; color: var(--signal); font-variant-numeric: tabular-nums; }
+.labdoc input[type=range] { width: 100%; accent-color: var(--signal); }
+.labdoc .seg { display: flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; background: var(--surface); }
+.labdoc .seg button { flex: 1; border: 0; background: transparent; color: var(--ink); font: 500 .9rem var(--f-body); padding: 8px 4px; cursor: pointer; transition: background-color .15s, color .15s; }
+.labdoc .seg button + button { border-left: 1px solid var(--line); }
+.labdoc .seg button[aria-pressed="true"] { background: var(--signal); color: var(--surface); }
+.labdoc .btns { display: flex; gap: 8px; }
+.labdoc .lbtn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 .9rem var(--f-body); padding: 8px 14px; border-radius: var(--r-sm); cursor: pointer; }
+.labdoc .lbtn.primary { background: var(--signal); border-color: var(--signal); color: var(--surface); }
+.labdoc button:focus-visible, .labdoc input:focus-visible, .labdoc summary:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.labdoc .scope { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.labdoc .scope-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+.labdoc .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .9rem; color: var(--muted); }
+.labdoc .legend span { display: inline-flex; align-items: center; }
+.labdoc .clock { font-family: var(--f-mono); font-size: .875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.labdoc canvas { display: block; width: 100%; max-width: 100%; }
+.labdoc .pill { align-self: flex-start; font-family: var(--f-mono); font-size: .875rem; padding: 2px 8px; border-radius: 99px; letter-spacing: .04em; }
+.labdoc .pill.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.labdoc .pill.warn { background: color-mix(in srgb, var(--spark) 16%, transparent); color: var(--spark); }
+.labdoc .pill.bad { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }

@@ -27,7 +27,7 @@ describe('lesson data', () => {
       expect(m.title.length).toBeGreaterThan(0)
       expect(m.headline.length).toBeGreaterThan(0)
       expect(m.minutes).toBeGreaterThanOrEqual(5)
-      expect(m.file).toBe(`/lab-files/${m.slug}.html`)
+      expect(m.file).toBe(m.native ? "" : `/lab-files/${m.slug}.html`)
       expect(slugs.has(m.slug)).toBe(false)
       slugs.add(m.slug)
     }
@@ -53,6 +53,12 @@ describe('parseLesson', () => {
     const m = parseLesson('2026-01-02-x.html', `<title>T</title><meta name="sdl:topic" content="Queues"><meta name="sdl:summary" content="Hi"><h1>H</h1>`)
     expect(m.topic).toBe('Queues')
     expect(m.summary).toBe('Hi')
+  })
+
+  it('reads native labs (.vue): meta comments, h1, lede, sections and sources', () => {
+    const tpl = `<!-- sdl:title: Rate Limiting -->\n<!-- sdl:topic: rate limiting -->\n<div class="labdoc"><header><span class="eyebrow">System Design Lab · x · y</span><h1>Count requests</h1><p class="lede">A hook.</p></header>\n<section><h2>Part A</h2><a href="https://x.dev">s</a></section></div>`
+    const m = parseLesson('2026-11-25-rate-limiting.vue', tpl)
+    expect(m).toMatchObject({ slug: 'rate-limiting', title: 'Rate Limiting', headline: 'Count requests', summary: 'A hook.', topic: 'Rate limiting', sections: ['Part A'], sources: 1, native: true, file: '' })
   })
 
   it('rejects badly named files', () => {

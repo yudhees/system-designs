@@ -13,19 +13,19 @@ npm test           # Vitest suite (API routes, feeds, lesson data, workflow guar
 
 | What | Where | Notes |
 | --- | --- | --- |
-| Labs | `content/lessons/YYYY-MM-DD-<slug>.html` | One self-contained HTML file per lab, exactly as the daily scheduled task publishes it. Title, topic, summary, reading time and sections are read from the file at build time. Served at `/labs/<slug>` (inside the site) and `/lab-files/<slug>.html` (raw). |
+| Labs | `app/labs/YYYY-MM-DD-<slug>.vue` | One Vue component per lab, rendered inline on `/labs/<slug>` with the site's own styles. Prose and widgets live in the template, the simulator in `<script setup lang="ts">`, shared styling comes from `app/assets/css/lab.css` (the `.labdoc` kit) and the site tokens. Title, topic, summary, reading time and sections are read from the template at build time. Older labs are standalone HTML in `content/lessons/*.html`, shown in an iframe, and are being converted. |
 | Articles | `content/articles/<slug>.md` | Markdown with `title`, `date`, `summary` front matter. |
 | About page, LinkedIn, contact | `app/app.config.ts` | Empty fields are hidden. |
 
-Optional overrides inside a lab's HTML: `<meta name="sdl:topic" content="Caching">`, `<meta name="sdl:summary" content="…">`, `<meta name="sdl:title" content="…">`. Without them, the topic comes from the eyebrow line (`System Design Lab · date · Topic`) and the summary from the `.lede` paragraph.
+Native labs declare `<!-- sdl:title: … -->` and `<!-- sdl:topic: … -->` comments at the top (optional `<!-- sdl:summary: … -->`; otherwise the summary is the `.lede` paragraph). Legacy HTML labs use `<meta name="sdl:topic" …>` style tags.
 
-`node scripts/check-lessons.mjs` validates lesson files (naming, size, title, h1, truncation, script origins).
+`node scripts/check-lessons.mjs` validates labs (naming, size, `.labdoc` root, h1, sdl comments, no extra imports or `v-html` for native labs; title, h1, truncation and script origins for legacy HTML).
 
 ## Daily auto-publish
 
 ```
 scheduled task (06:30 IST) ── publishes the artifact
-        └─ commits content/lessons/<date>-<slug>.html to a claude/* branch and pushes
+        └─ commits app/labs/<date>-<slug>.vue to a claude/* branch and pushes
 GitHub Action "Publish lesson"
         ├─ only new lesson files on the branch? otherwise stop (leave it for a PR)
         ├─ check-lessons + full nuxt build

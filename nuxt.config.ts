@@ -3,7 +3,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
   devtools: { enabled: false },
   modules: ['~~/modules/content'],
-  css: ['~/assets/css/main.css'],
+  css: ['~/assets/css/main.css', '~/assets/css/lab.css'],
 
   runtimeConfig: {
     newsletterProvider: 'kit', // NUXT_NEWSLETTER_PROVIDER: kit | buttondown
