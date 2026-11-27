@@ -121,12 +121,12 @@ const parts = [
 .today-card a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
 .today-card h2 { font-size: clamp(1.7rem, 3.6vw, 2.7rem); max-width: 26ch; }
 .today-meta { display: flex; gap: 14px; align-items: center; font-size: .92rem; opacity: .8; }
-.flag { background: var(--spark-fill); color: #14233b; font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: 0.875rem; opacity: 1; }
+.flag { background: var(--spark-fill); color: #17181c; font-weight: 700; padding: 3px 10px; border-radius: 999px; font-size: 0.875rem; opacity: 1; }
 .summary { font-size: 1.08rem; max-width: 66ch; opacity: .85; }
 .today-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; font-size: .92rem; }
 .today-foot .topic, .today-foot .muted { color: color-mix(in srgb, var(--bg) 70%, transparent); }
 .today-foot .btn { background: var(--bg); color: var(--ink); border-color: var(--bg); }
-.today-foot .btn:hover { background: var(--spark-fill); border-color: var(--spark-fill); color: #14233b; }
+.today-foot .btn:hover { background: var(--spark-fill); border-color: var(--spark-fill); color: #17181c; }
 .push { margin-left: auto; }
 
 .parts { margin-top: 96px; display: grid; gap: 28px; }

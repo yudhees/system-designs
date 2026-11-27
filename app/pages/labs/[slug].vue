@@ -152,7 +152,7 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
 .mark { font: 600 .88rem var(--f-body); background: var(--surface); color: var(--ink); border: 1.5px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
 .mark:hover { border-color: var(--ink); }
 .mark.on { color: var(--ok); border-color: var(--ok); }
-.frame { display: block; width: 100%; border: 0; background: var(--bg); }
+.frame { display: block; width: 100%; border: 0; background: transparent; animation: fade .5s ease both; }
 .end { display: grid; gap: 40px; margin-top: 24px; }
 .done-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
 .pager { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -164,15 +164,15 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
 .sub h2 { font-size: 1.5rem; }
 
 .progress { position: fixed; top: 64px; left: 0; right: 0; height: 3px; z-index: 40; pointer-events: none; }
-.progress i { display: block; height: 100%; background: var(--signal); transform-origin: left; transform: scaleX(0); }
+.progress i { transition: transform .12s linear; display: block; height: 100%; background: var(--signal); transform-origin: left; transform: scaleX(0); }
 .stage { display: block; }
 /* the lab document keeps its own 16px side padding, so trim the container's to line text up with the header */
 .stage { padding-inline: max(0px, calc(var(--gutter) - 16px)); }
 .toc, .mtoc { display: none; }
 .toc ol, .mtoc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-.toc a, .mtoc a { display: block; padding: 7px 12px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; font-size: .92rem; }
+.toc a, .mtoc a { transition: color .2s, border-color .2s, background-color .2s, padding-left .2s; display: block; padding: 7px 12px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; font-size: .92rem; }
 .toc a:hover, .mtoc a:hover { color: var(--ink); }
-.toc a.on, .mtoc a.on { color: var(--ink); border-left-color: var(--signal); font-weight: 600; }
+.toc a.on, .mtoc a.on { padding-left: 16px; color: var(--ink); border-left-color: var(--signal); font-weight: 600; }
 .cap { font: 600 0.875rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px 12px; }
 .pct { margin: 12px 0 0 12px; font-size: 0.875rem; }
 @media (min-width: 1180px) {
