@@ -8,7 +8,7 @@ export default defineAppConfig({
     name: 'Yudhees',
     role: 'Full-stack engineer',
     // Leave a field empty to hide it on the About page.
-    linkedin: '', // e.g. https://www.linkedin.com/in/your-handle
+    linkedin: 'https://www.linkedin.com/in/yudhees',
     email: '',
     github: 'https://github.com/yudhees',
     x: '',
