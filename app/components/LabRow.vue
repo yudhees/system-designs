@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { LessonMeta } from '#content'
-const props = defineProps<{ lab: LessonMeta, done?: boolean }>()
+const props = defineProps<{ lab: LessonMeta, done?: boolean, latest?: boolean }>()
 const color = computed(() => topicColor(props.lab.topic))
 </script>
 
@@ -16,6 +16,7 @@ const color = computed(() => topicColor(props.lab.topic))
       <div class="meta">
         <span class="topic" :style="{ '--dot': color }">{{ lab.topic }}</span>
         <span class="muted">{{ lab.minutes }} min</span>
+        <span v-if="latest" class="new">Newest</span>
         <span v-if="done" class="done">Done</span>
       </div>
     </div>
@@ -40,4 +41,5 @@ h3 a { color: var(--ink); text-decoration: none; }
 .done::before { content: "✓ "; }
 .go { width: 22px; height: 22px; margin-top: 8px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); transition: transform .15s, color .15s; }
 @media (max-width: 560px) { .lab { grid-template-columns: 48px 1fr; gap: 14px; } .go { display: none; } .d { font-size: 1.5rem; } }
+.new { font: 700 .875rem var(--f-body); color: var(--signal); background: var(--signal-soft); border-radius: 999px; padding: 2px 10px; }
 </style>
