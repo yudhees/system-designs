@@ -11,7 +11,7 @@ export default defineNuxtConfig({
     kitFormId: '', // NUXT_KIT_FORM_ID
     buttondownApiKey: '', // NUXT_BUTTONDOWN_API_KEY
     public: {
-      siteUrl: 'https://sdlab.vercel.app', // NUXT_PUBLIC_SITE_URL
+      siteUrl: 'https://sdlab-yudhees-projects.vercel.app', // NUXT_PUBLIC_SITE_URL
     },
   },
 

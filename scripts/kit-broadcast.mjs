@@ -9,7 +9,7 @@ import { basename } from 'node:path'
 
 const key = process.env.KIT_API_KEY
 if (!key) { console.log('KIT_API_KEY not set; skipping newsletter broadcast.'); process.exit(0) }
-const site = (process.env.SITE_URL || 'https://sdlab.vercel.app').replace(/\/$/, '')
+const site = (process.env.SITE_URL || 'https://sdlab-yudhees-projects.vercel.app').replace(/\/$/, '')
 const mode = process.env.KIT_BROADCAST_MODE === 'send' ? 'send' : 'draft'
 
 const strip = s => s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim()
