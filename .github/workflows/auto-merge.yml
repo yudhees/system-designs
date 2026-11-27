@@ -70,9 +70,19 @@ jobs:
 
       - name: Squash-merge
         if: steps.pr.outputs.ok == 'true'
+        env:
+          NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           # --match-head-commit refuses the merge if someone pushed after CI ran.
-          gh pr merge "${{ steps.pr.outputs.number }}" --squash \
-            --match-head-commit "$TESTED_SHA"
+          # GitHub's API sometimes answers 502 even though the merge went through,
+          # so after a failed call check the PR's real state before retrying.
+          for attempt in 1 2 3; do
+            if gh pr merge "$NUMBER" --squash --match-head-commit "$TESTED_SHA"; then break; fi
+            sleep $((attempt * 10))
+            if [ "$(gh pr view "$NUMBER" --json state --jq .state)" = "MERGED" ]; then
+              echo "::notice::PR #$NUMBER is merged (the API error was transient)."; break
+            fi
+            if [ "$attempt" = 3 ]; then echo "::error::Could not merge PR #$NUMBER."; exit 1; fi
+          done
           gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$BRANCH" \
             || echo "::notice::Could not delete $BRANCH (already gone?)."
