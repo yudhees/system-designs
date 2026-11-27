@@ -1,6 +1,7 @@
 ---
 title: How to get the most out of a lab
 date: 2026-11-26
+tag: Study guide
 summary: A 30-minute routine for each lab, so the ideas stick and you can explain them in a design review or an interview.
 ---
 

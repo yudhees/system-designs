@@ -33,6 +33,7 @@ export interface ArticleMeta {
   date: string
   title: string
   summary: string
+  tag: string
   minutes: number
   html: string
 }
@@ -91,6 +92,7 @@ function parseArticle(file: string, src: string): ArticleMeta {
     date: fm.date || '1970-01-01',
     title: fm.title || slug,
     summary: fm.summary || '',
+    tag: fm.tag || 'Article',
     minutes: Math.max(1, Math.round(words(body) / 220)),
     html: marked.parse(body, { async: false }) as string,
   }
@@ -141,7 +143,7 @@ export default defineNuxtModule({
       filename: 'types/sdl-content.d.ts',
       getContents: () => `declare module '#content' {
   export interface LessonMeta { slug: string; date: string; title: string; headline: string; summary: string; topic: string; minutes: number; sections: string[]; sources: number; file: string }
-  export interface ArticleMeta { slug: string; date: string; title: string; summary: string; minutes: number; html: string }
+  export interface ArticleMeta { slug: string; date: string; title: string; summary: string; tag: string; minutes: number; html: string }
   export const lessons: LessonMeta[]
   export const articles: ArticleMeta[]
 }`,
