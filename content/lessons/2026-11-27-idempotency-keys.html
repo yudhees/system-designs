@@ -136,7 +136,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
 <header>
   <div class="eyebrow">System Design Lab · 27 Nov 2026 · Idempotency</div>
   <h1>Retry without paying twice</h1>
-  <p class="hook">Your API charged the guest's card. The response died on the way back. The app retries. Did the guest just pay for two rooms?</p>
+  <p class="hook">Your API charged the shopper's card. The response died on the way back. The app retries. Did they just pay twice?</p>
   <div class="tldr">
     <b class="tag">TL;DR</b>
     <p>Networks lose responses, so clients must retry. Retrying is only safe if the server can tell "this is the same request again" from "this is a new request".</p>
@@ -165,7 +165,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
     <div class="tile"><span class="t">With a ticket</span><p>You write ticket <code>#A7</code> first. If you are unsure, ask again with <code>#A7</code>. The attendant says "#A7 is already hanging" and hands you the same receipt.</p></div>
   </div>
   <ul>
-    <li><b>Idempotent</b>: doing it once or ten times leaves the same state. <code>GET</code> and <code>DELETE</code> already behave this way. <code>POST /bookings</code> does not.</li>
+    <li><b>Idempotent</b>: doing it once or ten times leaves the same state. <code>GET</code> and <code>DELETE</code> already behave this way. <code>POST /orders</code> does not.</li>
     <li><b>Idempotency key</b>: a random ID the <i>client</i> creates once per intent (Stripe suggests a V4 UUID) and resends unchanged on every retry.</li>
     <li><b>Claim</b>: the server's atomic "insert this key or tell me it exists", usually a unique index.</li>
   </ul>
@@ -189,7 +189,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
   </svg></div>
 
   <div class="callout c-key"><span class="tag">Key idea</span>
-    <p>Recording the key and doing the work must succeed or fail <b>together</b>. AWS says this must be an ACID operation. Otherwise you get a key with no booking, or a booking with no key.</p></div>
+    <p>Recording the key and doing the work must succeed or fail <b>together</b>. AWS says this must be an ACID operation. Otherwise you get a key with no order, or an order with no key.</p></div>
 
   <div class="tablebox"><table>
     <thead><tr><th>Design</th><th>Lost response</th><th>Double-tap / parallel retry</th><th>Crash mid-request</th></tr></thead>
@@ -205,7 +205,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
       <li><b>Same key, different body.</b> AWS returns a parameter-mismatch validation error. Brandur's Postgres design returns <code>409</code>. Never replay a response for a different request.</li>
       <li><b>A stuck "in progress" key.</b> If the server dies mid-request, the key stays locked. Orpheus gives each lease an expiry, so a retry is allowed only after the lease runs out.</li>
       <li><b>Replica lag.</b> Orpheus always reads idempotency rows from the <b>primary</b>. A replica may not have the first response yet.</li>
-      <li><b>Downstream calls.</b> A charge to Stripe or a supplier is a "foreign state mutation" that you can't roll back. Give it its own derived key.</li>
+      <li><b>Downstream calls.</b> A charge at a payment provider or a call to a partner API is a "foreign state mutation" that you can't roll back. Give it its own derived key.</li>
     </ul></div>
 </section>
 </div>
@@ -213,22 +213,22 @@ details > div{margin-top:10px;display:grid;gap:10px}
 <section class="wide" id="lab">
   <div class="wrap" style="display:grid;gap:10px">
     <div class="eyebrow">Interactive lab</div>
-    <h2>Break the booking API</h2>
+    <h2>Break the checkout API</h2>
   </div>
   <div class="lab">
-    <p class="goal"><b>Try this:</b> send the same bookings through both APIs, drop responses, and watch which ledger fills with red duplicate charges.</p>
+    <p class="goal"><b>Try this:</b> send the same orders through both APIs, drop responses, and watch which ledger fills with red duplicate charges.</p>
     <div class="controls">
       <div class="ctl"><label for="loss">Responses lost <output id="lossOut">25%</output></label>
         <input type="range" id="loss" min="0" max="60" step="5" value="25"><small>The server finishes, but the reply never arrives (failure ③).</small></div>
       <div class="ctl"><label for="retries">Max client retries <output id="retriesOut">3</output></label>
         <input type="range" id="retries" min="0" max="5" step="1" value="3"><small>Exponential backoff with jitter, same seed for both lanes.</small></div>
-      <div class="ctl"><label class="switch" for="dbl"><input type="checkbox" id="dbl"> Guest double-taps "Book"</label>
-        <small>Each booking fires two requests 0.13 s apart, carrying the same key.</small></div>
+      <div class="ctl"><label class="switch" for="dbl"><input type="checkbox" id="dbl"> Shopper double-taps "Pay"</label>
+        <small>Each order fires two requests 0.13 s apart, carrying the same key.</small></div>
       <div class="ctl"><label class="switch" for="atomic"><input type="checkbox" id="atomic" checked> Atomic key claim (right lane)</label>
         <small>Off = SELECT first, INSERT the key after the work.</small></div>
     </div>
     <div class="btns">
-      <button class="primary" id="one">Book 1 room</button>
+      <button class="primary" id="one">Place 1 order</button>
       <button id="burst">Burst of 10</button>
       <button id="auto" aria-pressed="false">Steady traffic: off</button>
       <button id="reset">Reset</button>
@@ -242,7 +242,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
     </div>
     <div class="lanes">
       <div class="lane" id="laneNaive">
-        <div class="lane-head"><h3>Naive <code>POST /bookings</code></h3><span class="pill naive">no key</span></div>
+        <div class="lane-head"><h3>Naive <code>POST /orders</code></h3><span class="pill naive">no key</span></div>
         <canvas id="cvNaive" aria-label="Animation of requests to the naive API"></canvas>
         <div class="stats" data-stats></div>
         <p class="money" data-money></p>
@@ -261,7 +261,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
       <ol>
         <li>Leave losses at 25% and hit <b>Burst of 10</b>. The left ledger turns red. The right lane serves purple <b>replays</b> instead.</li>
         <li>Turn on <b>double-tap</b>, then switch <b>Atomic key claim</b> off and burst again. Duplicates appear on the right too: both taps read "no key yet" before either one saves it. The key alone isn't the fix. The atomic claim is.</li>
-        <li>Turn double-tap off and set <b>Max retries to 0</b>. Duplicates vanish on the left, but "charged, guest saw error" climbs. You can't avoid retries. You can only make them safe.</li>
+        <li>Turn double-tap off and set <b>Max retries to 0</b>. Duplicates vanish on the left, but "charged, shopper saw error" climbs. You can't avoid retries. You can only make them safe.</li>
       </ol>
     </div>
   </div>
@@ -270,37 +270,37 @@ details > div{margin-top:10px;display:grid;gap:10px}
 <div class="wrap">
 <section>
   <div class="eyebrow">Solve it</div>
-  <h2>One booking, four ways to duplicate it</h2>
+  <h2>One order, four ways to duplicate it</h2>
   <div class="scenario">
-    <p><b>Scenario.</b> A guest books a hotel room through your meta-search checkout. Your API (1) charges the card with the PSP, (2) calls the supplier's booking API, and (3) publishes <code>booking.confirmed</code> to Kafka for emails and invoices.</p>
-    <p>The supplier API has <b>no idempotency support</b> and sometimes times out after it has already booked the room. The mobile app retries on timeouts. Fargate tasks get stopped during deploys.</p>
-    <p><b>Design it so that no guest is charged twice, no room is booked twice, and no confirmation email goes out twice.</b></p>
+    <p><b>Scenario.</b> A shopper pays for an order in your mobile app. Your API (1) charges the card with the payment provider, (2) asks a partner's fulfilment API to create the shipment, and (3) publishes <code>order.confirmed</code> to a message queue for emails and invoices.</p>
+    <p>The fulfilment API has <b>no idempotency support</b> and sometimes times out after it has already created the shipment. The mobile app retries on timeouts. Servers get stopped during deploys.</p>
+    <p><b>Design it so that no shopper is charged twice, no shipment is created twice, and no confirmation email goes out twice.</b></p>
   </div>
   <details><summary>Hint 1: where does the key come from?</summary><div><p>Generate it on the device when the checkout screen opens, not per HTTP attempt. A double-tap and a retry must carry the same key.</p></div></details>
-  <details><summary>Hint 2: the supplier can't dedupe for you</summary><div><p>Send the supplier your own unique reference. After a timeout, look the booking up before you retry.</p></div></details>
-  <details><summary>Hint 3: think in phases</summary><div><p>Each external call is its own step. Save a recovery point after every one, so a restarted task knows where to resume.</p></div></details>
+  <details><summary>Hint 2: the partner can't dedupe for you</summary><div><p>Send the partner your own unique reference. After a timeout, look the shipment up before you retry.</p></div></details>
+  <details><summary>Hint 3: think in phases</summary><div><p>Each external call is its own step. Save a recovery point after every one, so a restarted server knows where to resume.</p></div></details>
   <details><summary><b>Reveal the model answer</b></summary><div>
     <ul>
       <li><b>Client</b>: UUID v4 per checkout, sent as <code>Idempotency-Key</code>. Retry with exponential backoff + jitter.</li>
-      <li><b>Claim</b>: insert <code>{userId, key, requestHash, status: started, lockedUntil}</code> under a unique index on <code>(userId, key)</code>, in the same transaction that creates the pending booking.</li>
+      <li><b>Claim</b>: insert <code>{userId, key, requestHash, status: started, lockedUntil}</code> under a unique index on <code>(userId, key)</code>, in the same transaction that creates the pending order.</li>
       <li><b>Existing key</b>: finished with the same hash → replay the stored code and body. Lease still active → <code>409</code> + <code>Retry-After</code>. Different hash → reject as a mismatch.</li>
-      <li><b>PSP charge</b>: pass a derived key such as <code>booking-{id}-charge</code>, so the PSP dedupes your own retries. Save <code>recovery_point = charged</code>.</li>
-      <li><b>Supplier</b>: send <code>clientRef = booking-{id}</code>. On timeout, mark the booking <i>unknown</i>, then retrieve by reference before re-booking. Never retry blindly.</li>
-      <li><b>Kafka</b>: write <code>booking.confirmed</code> to an outbox in the final transaction. The email consumer dedupes on event ID with a unique index, because redelivery will happen.</li>
+      <li><b>Payment charge</b>: pass a derived key such as <code>order-{id}-charge</code>, so the provider dedupes your own retries. Save <code>recovery_point = charged</code>.</li>
+      <li><b>Fulfilment partner</b>: send <code>clientRef = order-{id}</code>. On timeout, mark the order <i>unknown</i>, then look the shipment up by reference before creating it again. Never retry blindly.</li>
+      <li><b>Events</b>: write <code>order.confirmed</code> to an outbox in the final transaction. The email consumer dedupes on event ID with a unique index, because redelivery will happen.</li>
       <li><b>Recovery</b>: a completer job picks up keys whose lease expired mid-flow and resumes from <code>recovery_point</code>. A reaper deletes keys after ~24–72 h.</li>
       <li><b>Reads</b>: read key rows from the primary, never a lagging replica.</li>
     </ul></div></details>
 </section>
 
 <section>
-  <div class="eyebrow">Apply to your stack</div>
-  <h2>Where this lives in your code</h2>
+  <div class="eyebrow">In practice</div>
+  <h2>Where this lives in real code</h2>
   <div class="stack">
-    <div class="row"><b>Laravel</b><p>Write an <code>Idempotency</code> middleware that claims the key inside <code>DB::transaction</code>, stores the response after the controller runs, and replays it on a repeat. <code>Cache::lock</code> alone can expire mid-request, so the stored row is the real guard.</p></div>
-    <div class="row"><b>Node.js</b><p>The same middleware in Express or Fastify. Call <code>insertOne</code> and treat duplicate-key error <code>E11000</code> as "this key already exists", then branch on its status.</p></div>
-    <div class="row"><b>MongoDB</b><p>A unique compound index on <code>{userId, key}</code> is the atomic claim. A TTL index on <code>createdAt</code> is the reaper. Read with primary read preference.</p></div>
-    <div class="row"><b>Kafka</b><p>Producer idempotence only stops duplicate writes from producer retries. Consumers still see redelivered messages after rebalances, so keep a processed-event-ID table in the consumer.</p></div>
-    <div class="row"><b>AWS Fargate</b><p>Tasks stop during deploys and scale-in, so any request can die halfway. Lease expiry plus a scheduled completer task turns "stuck" into "resumed".</p></div>
+    <div class="row"><b>Web frameworks</b><p>Write one idempotency middleware that claims the key inside a database transaction, stores the response after the handler runs, and replays it on a repeat. A cache lock alone can expire mid-request, so the stored row is the real guard.</p></div>
+    <div class="row"><b>Any language</b><p>The same middleware works in every stack. Insert the key row and treat a duplicate-key error as "this key already exists", then branch on its status.</p></div>
+    <div class="row"><b>Databases</b><p>A unique compound index on <code>(user, key)</code> is the atomic claim. A scheduled cleanup or expiry index is the reaper. Read key rows from the primary.</p></div>
+    <div class="row"><b>Queues and logs</b><p>Producer idempotence only stops duplicate writes from producer retries. Consumers still see redelivered messages after rebalances, so keep a processed-event-ID table in the consumer.</p></div>
+    <div class="row"><b>Deploys and autoscaling</b><p>Servers stop during deploys and scale-in, so any request can die halfway. Lease expiry plus a scheduled completer job turns "stuck" into "resumed".</p></div>
   </div>
 </section>
 
@@ -440,8 +440,8 @@ details > div{margin-top:10px;display:grid;gap:10px}
     render() {
       const s = this.s;
       const rows = [
-        ['Bookings requested', s.requested], ['Rooms charged', s.charged], ['Duplicate charges', s.dup, s.dup > 0],
-        ['Replays served', s.replays], ['409 conflicts', s.conflicts], ['Charged, guest saw error', s.errCharged, s.errCharged > 0]
+        ['Orders requested', s.requested], ['Orders charged', s.charged], ['Duplicate charges', s.dup, s.dup > 0],
+        ['Replays served', s.replays], ['409 conflicts', s.conflicts], ['Charged, shopper saw error', s.errCharged, s.errCharged > 0]
       ];
       this.statsEl.innerHTML = rows.map(([k, v, al]) => `<div class="stat${al ? ' alert' : ''}"><span class="v">${v}</span><span class="k">${k}</span></div>`).join('');
       this.moneyEl.innerHTML = `Overcharged: <b>₹${(s.dup * PRICE).toLocaleString('en-IN')}</b> at an example rate of ₹${PRICE.toLocaleString('en-IN')}/night`;
@@ -461,8 +461,8 @@ details > div{margin-top:10px;display:grid;gap:10px}
         ctx.fillStyle = col.muted; ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillText(sub, x + bw / 2, by + 36);
       };
       const flash = this.flashes.length ? (this.flashes[this.flashes.length - 1].dup ? col.dup : col.ok) : null;
-      box(cx, 'Guest app', 'retries', null);
-      box(sx, 'Booking API', this.inProc ? 'busy ' + this.inProc : 'idle', this.inProc ? col.accent : null);
+      box(cx, 'Shopper app', 'retries', null);
+      box(sx, 'Checkout API', this.inProc ? 'busy ' + this.inProc : 'idle', this.inProc ? col.accent : null);
       box(px, 'Payments', '₹ × ' + this.s.charged, flash);
       // key store
       if (this.mode === 'key') {
@@ -539,7 +539,7 @@ details > div{margin-top:10px;display:grid;gap:10px}
   $('auto').addEventListener('click', e => { auto = !auto; e.target.setAttribute('aria-pressed', auto); e.target.textContent = 'Steady traffic: ' + (auto ? 'on' : 'off'); });
   $('reset').addEventListener('click', () => { seed++; nextIntent = 1; lanes.forEach(l => l.reset()); });
 
-  // open in a working state: a few sample bookings already in flight
+  // open in a working state: a few sample orders already in flight
   for (let i = 0; i < 4; i++) setTimeout(book, 300 + i * 400);
   window.__lab = { lanes, cfg, book };
 })();

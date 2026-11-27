@@ -156,7 +156,7 @@ pre{background:var(--sunk);border-radius:8px;padding:12px;overflow-x:auto;font-f
 
 <section>
   <h2>Lab: resize the cluster and watch keys remap</h2>
-  <p class="col">1,200 hotel keys (<code>htl_0001…</code>) live on the ring. Add or kill nodes and compare how many keys move under <code>mod N</code> and under the ring. Switch traffic to <em>Zipf</em> to make a few hotels hot, then turn on bounded loads and watch the red capacity line hold.</p>
+  <p class="col">1,200 conversation keys (<code>chat_0001…</code>) live on the ring. Add or kill nodes and compare how many keys move under <code>mod N</code> and under the ring. Switch traffic to <em>Zipf</em> to make a few conversations hot, then turn on bounded loads and watch the red capacity line hold.</p>
   <div class="lab">
     <div class="lab-grid">
       <div>
@@ -177,7 +177,7 @@ pre{background:var(--sunk);border-radius:8px;padding:12px;overflow-x:auto;font-f
           <span style="font-size:.9rem">Traffic</span>
           <div class="seg" role="group" aria-label="Traffic distribution">
             <button id="tUni" aria-pressed="false">Uniform</button>
-            <button id="tZipf" aria-pressed="true">Zipf (hot hotels)</button>
+            <button id="tZipf" aria-pressed="true">Zipf (hot chats)</button>
           </div>
         </div>
         <label class="toggle"><input type="checkbox" id="bounded"> Bounded loads</label>
@@ -205,22 +205,22 @@ pre{background:var(--sunk);border-radius:8px;padding:12px;overflow-x:auto;font-f
 </section>
 
 <section>
-  <h2>Solve it: supplier-rate cache during a Diwali peak</h2>
+  <h2>Solve it: the chat cache during a big match</h2>
   <div class="scenario col">
-    <p>Your meta-search caches supplier availability and rates in 8 Redis nodes (not Redis Cluster, plain instances behind the app) keyed by <code>rate:{hotelId}:{checkin}:{nights}:{occupancy}</code> and picked with <code>crc32(key) % 8</code>. The hit rate is 92%. On a festival weekend, Fargate scaling adds a 9th cache node and a 9th search worker. Within a minute, supplier calls spike about 10×. Two suppliers start returning HTTP 429, and search p99 goes from 900 ms to 6 s. At the same time, one Goa resort and a handful of Mumbai hotels get 30% of all lookups, and the node that owns them hits its CPU limit.</p>
-    <p class="q">Redesign key placement so that (a) scaling the cache tier doesn't cause a supplier storm, (b) hot hotels can't overload one node, and (c) booking events stay ordered per booking in Kafka when you add partitions.</p>
+    <p>A chat app caches the latest messages of each conversation in 8 plain cache nodes (not a clustered cache, just separate instances behind the app), keyed by <code>conv:{conversationId}</code> and picked with <code>crc32(key) % 8</code>. The hit rate is 92%. During a big football final, autoscaling adds a 9th cache node and a 9th chat worker. Within a minute, database reads spike about 10×, the message database starts timing out, and chat p99 goes from 900 ms to 6 s. At the same time, one public watch-party room and a handful of popular group chats get 30% of all lookups, and the node that owns them hits its CPU limit.</p>
+    <p class="q">Redesign key placement so that (a) scaling the cache tier doesn't cause a database storm, (b) hot conversations can't overload one node, and (c) messages stay ordered per conversation in the message log when you add partitions.</p>
   </div>
   <div class="col">
-  <details><summary>Hint 1: Do the remap arithmetic</summary><p>Going from 8 to 9 nodes under mod N moves about 8/9 ≈ 89% of keys. Your effective hit rate collapses from 92% to around 10% instantly, and every miss is a supplier call.</p></details>
-  <details><summary>Hint 2: Key count isn't load</summary><p>Vnodes balance <em>keys</em>. The hot-hotel problem is <em>request weight per key</em>. You need a load-aware rule (bounded loads), key replication for the very hottest keys, or both.</p></details>
-  <details><summary>Hint 3: Kafka doesn't rehash for you</summary><p>The default partitioner is <code>murmur2(key) % numPartitions</code>. Kafka's docs say adding partitions doesn't change the partitioning of existing data and that Kafka won't redistribute data automatically, so new events for an existing booking can land on a different partition than its earlier events.</p></details>
+  <details><summary>Hint 1: Do the remap arithmetic</summary><p>Going from 8 to 9 nodes under mod N moves about 8/9 ≈ 89% of keys. Your effective hit rate collapses from 92% to around 10% instantly, and every miss is a database read.</p></details>
+  <details><summary>Hint 2: Key count isn't load</summary><p>Vnodes balance <em>keys</em>. The hot-room problem is <em>request weight per key</em>. You need a load-aware rule (bounded loads), key replication for the very hottest keys, or both.</p></details>
+  <details><summary>Hint 3: A partitioned log doesn't rehash for you</summary><p>Most partitioned logs pick a partition with <code>hash(key) % numPartitions</code>. Kafka's default partitioner is <code>murmur2(key) % numPartitions</code>, and its docs say adding partitions doesn't change the partitioning of existing data and that Kafka won't redistribute data automatically, so new messages for an existing conversation can land on a different partition than its earlier ones.</p></details>
   <details><summary>Show model answer</summary>
     <ul class="tight">
-      <li><strong>Placement:</strong> replace <code>% N</code> with a ketama-style ring (100–200 vnodes per node, weighted by instance size) or move to Redis Cluster's 16384 hash slots. Adding the 9th node now moves about 1/9 of keys, taken evenly from all 8 nodes. Better still, pre-split: run more, smaller logical shards than you need and move slots, not keys.</li>
-      <li><strong>Warm-up:</strong> treat cache resizes as deploys. Add the node to the ring with low weight and ramp it up, or dual-read from old and new owners for one TTL window. Keep a stale-while-revalidate copy so a miss doesn't have to call the supplier.</li>
-      <li><strong>Supplier shield:</strong> coalesce in-flight misses per key (single-flight) and put a per-supplier token bucket in front of fan-out, so a cold cache degrades latency instead of tripping 429s. This connects to the earlier labs on stampedes and rate limiting.</li>
-      <li><strong>Hot hotels:</strong> route with bounded loads (c ≈ 1.25) at the routing layer, so overflow spills to the next ring node. For the top few keys, also replicate: write <code>rate:{id}#r0..r3</code> and read a random replica, or keep a 1–5 s in-process L1 cache in each search worker. Detect hot keys from request counters, not by guessing.</li>
-      <li><strong>Kafka:</strong> key booking events by <code>bookingId</code>. Size partitions for peak at creation, since adding partitions breaks per-key ordering. If you must grow, create a new topic with more partitions, dual-write, drain the old topic, then cut consumers over. Consumers stay idempotent on <code>(bookingId, eventSeq)</code> so the overlap is harmless.</li>
+      <li><strong>Placement:</strong> replace <code>% N</code> with a ketama-style ring (100–200 vnodes per node, weighted by instance size) or move to a fixed slot scheme such as Redis Cluster's 16384 hash slots. Adding the 9th node now moves about 1/9 of keys, taken evenly from all 8 nodes. Better still, pre-split: run more, smaller logical shards than you need and move slots, not keys.</li>
+      <li><strong>Warm-up:</strong> treat cache resizes as deploys. Add the node to the ring with low weight and ramp it up, or dual-read from old and new owners for one TTL window. Keep a stale-while-revalidate copy so a miss doesn't have to hit the database.</li>
+      <li><strong>Database shield:</strong> coalesce in-flight misses per key (single-flight) and put a rate limit in front of the database reads, so a cold cache degrades latency instead of tipping the database over. This connects to the earlier labs on stampedes and rate limiting.</li>
+      <li><strong>Hot rooms:</strong> route with bounded loads (c ≈ 1.25) at the routing layer, so overflow spills to the next ring node. For the top few keys, also replicate: write <code>conv:{id}#r0..r3</code> and read a random replica, or keep a 1–5 s in-process cache in each chat worker. Detect hot keys from request counters, not by guessing.</li>
+      <li><strong>Message log:</strong> key messages by <code>conversationId</code>. Size partitions for peak at creation, since adding partitions breaks per-key ordering. If you must grow, create a new topic with more partitions, dual-write, drain the old topic, then cut consumers over. Consumers stay idempotent on <code>(conversationId, messageSeq)</code> so the overlap is harmless.</li>
       <li><strong>Trade-off to state:</strong> bounded loads and replicas reduce cache affinity, so hit rate dips slightly when spill happens. You accept that in exchange for a hard ceiling on any one node.</li>
     </ul>
   </details>
@@ -228,13 +228,13 @@ pre{background:var(--sunk);border-radius:8px;padding:12px;overflow-x:auto;font-f
 </section>
 
 <section>
-  <h2>Apply to your stack</h2>
+  <h2>In practice</h2>
   <div class="stackmap">
-    <div><h3>Laravel cache</h3><p>With the memcached driver, set <code>Memcached::OPT_LIBKETAMA_COMPATIBLE =&gt; true</code> in <code>config/cache.php</code> options to get ketama consistent hashing instead of modulo. With Redis Cluster, keep related keys together with hash tags, e.g. <code>rate:{htl_123}:…</code>, so multi-key ops stay on one slot.</p></div>
-    <div><h3>Node.js routing</h3><p>For sticky routing of supplier connectors or per-hotel workers, keep a sorted array of vnode hashes and binary-search it. Rebuild it only on membership change and publish it read-only, as Discord learned. Never compute the ring per request.</p></div>
-    <div><h3>MongoDB</h3><p>Use a hashed shard key for monotonically increasing fields (ObjectId, timestamps) to avoid a single hot chunk. Ranges then become broadcast queries, so for availability lookups prefer a compound key such as <code>{ supplierId: 1, hotelId: "hashed" }</code>: equality targeting and zones on the prefix, even spread on the hash.</p></div>
-    <div><h3>Kafka</h3><p>Partition count is part of your key → partition contract. Over-provision partitions at topic creation for booking and webhook topics, key by the entity whose ordering matters, and treat repartitioning as a migration, not a config change.</p></div>
-    <div><h3>AWS Fargate</h3><p>Autoscaling changes membership often. Any tier that keys state to task identity (in-memory caches, sticky consumers) needs ring placement plus a warm-up ramp, or scale-out events will look like cache flushes.</p></div>
+    <div><h3>Application caches</h3><p>Many cache clients can use ketama-style consistent hashing instead of modulo, usually behind a single option. Turn it on. With a slot-based cluster, keep related keys together with hash tags, e.g. <code>conv:{123}:…</code>, so multi-key operations stay on one slot.</p></div>
+    <div><h3>Routing in application code</h3><p>For sticky routing of connections or per-room workers, keep a sorted array of vnode hashes and binary-search it. Rebuild it only on membership change and publish it read-only, as Discord learned. Never compute the ring per request.</p></div>
+    <div><h3>Sharded databases</h3><p>Use a hashed shard key for monotonically increasing fields (IDs, timestamps) to avoid a single hot chunk. Ranges then become broadcast queries, so for lookups prefer a compound key such as <code>{ tenantId: 1, roomId: "hashed" }</code>: equality targeting on the prefix, even spread on the hash.</p></div>
+    <div><h3>Partitioned logs</h3><p>Partition count is part of your key → partition contract. Over-provision partitions at topic creation for ordered streams, key by the entity whose ordering matters, and treat repartitioning as a migration, not a config change.</p></div>
+    <div><h3>Autoscaled fleets</h3><p>Autoscaling changes membership often. Any tier that keys state to instance identity (in-memory caches, sticky consumers) needs ring placement plus a warm-up ramp, or scale-out events will look like cache flushes.</p></div>
   </div>
 </section>
 
@@ -260,7 +260,7 @@ const PALETTE=["#2a7de1","#e0633a","#2fa36b","#9b5de5","#d4a017","#e0457b","#17a
 const K=1200;
 function h32(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}
   h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return h>>>0;}
-const keys=[];for(let i=0;i<K;i++){const id="htl_"+String(i+1).padStart(4,"0");keys.push({id,pos:h32(id),w:1});}
+const keys=[];for(let i=0;i<K;i++){const id="chat_"+String(i+1).padStart(4,"0");keys.push({id,pos:h32(id),w:1});}
 // Zipf weights over a hash-shuffled rank
 const rankOrder=keys.map((k,i)=>i).sort((a,b)=>h32("rank"+a)-h32("rank"+b));
 const zipfW=new Array(K);{let tot=0;rankOrder.forEach((ki,r)=>{const w=1/Math.pow(r+1,1.05);zipfW[ki]=w;tot+=w;});for(let i=0;i<K;i++)zipfW[i]=zipfW[i]*K/tot;}

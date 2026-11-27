@@ -209,49 +209,49 @@ pre code{background:none;padding:0}
 
 <section class="col" id="solve">
   <div class="eyebrow">Solve it</div>
-  <h2>New Year's Eve in Goa</h2>
+  <h2>The flash sale</h2>
   <div class="scenario">
-    <p>Your meta-search API runs as 40 Node.js tasks on Fargate behind an ALB. Search results are priced from a cache keyed by <code>supplier:hotelId:checkin:nights:occupancy</code> with a 15-minute TTL. One wholesale supplier carries most Goa inventory. Its contract:</p>
+    <p>An online shop serves product pages from 40 identical app servers behind a load balancer. Prices and stock come from a shared pricing service and are cached under a key like <code>product:{id}:price</code> with a 15-minute TTL. The pricing service is the fragile part. Its limits:</p>
     <ul>
-      <li>Hard rate limit of <strong>50 req/s</strong> per API key. Above that it returns 429, and repeated breaches get the key throttled for 10 minutes.</li>
-      <li>Availability call p50 1.2 s, p99 6 s. You time out at 8 s.</li>
+      <li>It handles about <strong>50 requests/s</strong>. Above that it starts returning errors, and repeated overload makes it shed load for 10 minutes.</li>
+      <li>A price lookup takes p50 1.2 s and p99 6 s. You give up after 8 s.</li>
     </ul>
-    <p>At 20:00 marketing pushes a "NYE in Goa" notification. Search traffic jumps to about <strong>500 searches/s</strong> for 30 minutes, spread over roughly 2,000 distinct price keys with a long tail. The heaviest 20 keys take 40% of traffic. To make it worse, a release went out at 19:55 and its deploy hook flushed the price cache.</p>
-    <p><strong>Design the read path for supplier prices so the supplier never sees more than 50 req/s, search p95 stays under 1.5 s, and a supplier outage degrades search instead of breaking it.</strong> State what you would do at the process, cluster and supplier boundaries, and what is allowed to be stale.</p>
+    <p>At 20:00 a "flash sale" notification goes out. Traffic jumps to about <strong>500 page views/s</strong> for 30 minutes, spread over roughly 2,000 distinct products with a long tail. The 20 hottest products take 40% of traffic. To make it worse, a release went out at 19:55 and its deploy script flushed the cache.</p>
+    <p><strong>Design the read path for prices so the pricing service never sees more than 50 req/s, page p95 stays under 1.5 s, and a pricing outage degrades the page instead of breaking it.</strong> State what you would do inside one server, across the cluster and at the pricing-service boundary, and what is allowed to be stale.</p>
   </div>
-  <details><summary>Hint 1: Size the two herds separately</summary><div class="body"><p>Per-key herd: the top keys get about 500 × 0.4 / 20 = 10 req/s each. With δ ≈ 1.2 s that is about 12 concurrent misses per hot key, times 40 tasks if each collapses only locally. Synchronised herd: after the flush, all 2,000 keys are cold at 20:00 and are all warmed within seconds, so they expire together at 20:15. Even perfect single-flight means 2,000 fetches against 50 req/s, which is 40 s of backlog.</p></div></details>
-  <details><summary>Hint 2: Separate "show a price" from "sell at a price"</summary><div class="body"><p>A search listing can tolerate a price that is a few minutes old. A booking cannot. That split tells you where stale-while-revalidate is safe and where you need a live re-check.</p></div></details>
-  <details><summary>Hint 3: Who is allowed to call the supplier?</summary><div class="body"><p>If any request path can call the supplier directly, the 50 req/s limit is only enforced by hoping. Consider a single admission point that every fetch, foreground or background, has to pass.</p></div></details>
+  <details><summary>Hint 1: Size the two herds separately</summary><div class="body"><p>Per-key herd: the top products get about 500 × 0.4 / 20 = 10 req/s each. With δ ≈ 1.2 s that is about 12 concurrent misses per hot key, times 40 servers if each collapses only locally. Synchronised herd: after the flush, all 2,000 keys are cold at 20:00 and are all warmed within seconds, so they expire together at 20:15. Even perfect single-flight means 2,000 fetches against 50 req/s, which is 40 s of backlog.</p></div></details>
+  <details><summary>Hint 2: Separate "show a price" from "charge a price"</summary><div class="body"><p>A product page can tolerate a price that is a few minutes old. Checkout cannot. That split tells you where stale-while-revalidate is safe and where you need a live re-check.</p></div></details>
+  <details><summary>Hint 3: Who is allowed to call the pricing service?</summary><div class="body"><p>If any request path can call it directly, the 50 req/s limit is only enforced by hoping. Consider a single admission point that every fetch, foreground or background, has to pass.</p></div></details>
   <details class="answer"><summary>Reveal model answer</summary><div class="body">
     <ol>
-      <li><strong>Collapse in two tiers.</strong> In each Node task, keep a <code>Map&lt;key, Promise&gt;</code> single-flight so 12 concurrent local misses become 1. Across tasks, take a Redis lock: <code>SET lock:{key} {token} NX PX 10000</code>, with a TTL above the 8 s supplier timeout so a slow fetch doesn't let a second one start. Losers wait on a short poll with jitter, or on pub/sub, for at most about 1 s, then fall back to stale or "price on request". Release with a compare-and-delete on the token, so a holder that outlived its lock can't delete someone else's.</li>
-      <li><strong>Soft and hard TTL with stale-while-revalidate for search.</strong> Store <code>{price, fetchedAt, softExp, hardExp, delta}</code>, for example soft 15 min (±15% jitter) and hard 2 h. Between soft and hard, serve the cached price and enqueue a refresh. This keeps p95 at cache latency even when the supplier is at p99.</li>
+      <li><strong>Collapse in two tiers.</strong> Inside each server, keep a map of in-flight fetches per key so 12 concurrent local misses become 1. Across servers, take a short-lived lock in the shared cache with a compare-and-set, such as <code>SET lock:{key} {token} NX PX 10000</code>. Make the lock's lifetime longer than the 8 s timeout so a slow fetch doesn't let a second one start. Losers wait briefly with jitter, for at most about 1 s, then fall back to a stale value or a "checking price" placeholder. Release with a compare-and-delete on the token, so a holder that outlived its lock can't delete someone else's.</li>
+      <li><strong>Soft and hard TTL with stale-while-revalidate for pages.</strong> Store <code>{price, fetchedAt, softExp, hardExp, delta}</code>, for example soft 15 min (±15% jitter) and hard 2 h. Between soft and hard, serve the cached price and queue a refresh. This keeps p95 at cache latency even when the pricing service is at p99.</li>
       <li><strong>Refresh before expiry on hot keys.</strong> Apply the XFetch test with the stored <code>delta</code> on reads. That gives early, decorrelated refresh for hot keys at no coordination cost, and keeps them from ever reaching the soft TTL.</li>
-      <li><strong>One admission point for the supplier.</strong> No request path calls the supplier directly. Foreground misses and background refreshes all go through a shared token bucket (Redis, or a Kafka topic <code>supplier-refresh</code> keyed by key so duplicates land on one partition and can be deduped). Run it below the limit, around 45 req/s, and give interactive cold misses priority over background refreshes. When the bucket is empty, serve stale. If there is no stale value, return the listing without that supplier's rate.</li>
-      <li><strong>Never mass-flush on deploy.</strong> Version the key prefix only when the payload schema changes. If you must start cold, pre-warm the top N keys by traffic from yesterday's logs through the same rate-limited queue, spread over minutes.</li>
-      <li><strong>Make failure cheap.</strong> Cache "no availability" and supplier errors as negative entries with a short TTL (30–60 s) so a failing supplier doesn't get called on every search. Put a circuit breaker on 429s and timeouts that switches the path to stale-only. Serve stale on error.</li>
-      <li><strong>Live re-check at booking.</strong> On "Book", always make one fresh, uncached availability and price call for that single room, protected by an idempotency key. Show a price-change notice if it moved. This is the one place where staleness is not acceptable, and its volume is small.</li>
+      <li><strong>One admission point for the pricing service.</strong> No request path calls it directly. Foreground misses and background refreshes all go through a shared token bucket, or a refresh queue keyed by cache key so duplicates collapse. Run it below the limit, around 45 req/s, and give interactive cold misses priority over background refreshes. When the bucket is empty, serve stale. If there is no stale value, render the page without that price.</li>
+      <li><strong>Never mass-flush on deploy.</strong> Change the key prefix only when the stored format changes. If you must start cold, pre-warm the top N keys by traffic from yesterday's logs through the same rate-limited queue, spread over minutes.</li>
+      <li><strong>Make failure cheap.</strong> Cache errors and "not available" results as negative entries with a short TTL (30–60 s) so a failing service doesn't get called on every page view. Put a circuit breaker on errors and timeouts that switches the path to stale-only. Serve stale on error.</li>
+      <li><strong>Live re-check at checkout.</strong> When the shopper presses "Buy", make one fresh, uncached price call for that single item, protected by an idempotency key. Show a price-change notice if it moved. This is the one place where staleness is not acceptable, and its volume is small.</li>
     </ol>
-    <p class="muted">Check the numbers. With 2,000 keys and jittered soft TTLs of 12.75–17.25 min, steady-state refresh is about 2,000 / 900 s ≈ 2.2 req/s on average, far under 50. The flush backlog of 2,000 fetches at 45 req/s drains in about 44 s while search serves "price on request" for cold tail keys. The 20 hot keys get prioritised and are warm in under a second.</p>
+    <p class="muted">Check the numbers. With 2,000 keys and jittered soft TTLs of 12.75–17.25 min, steady-state refresh is about 2,000 / 900 s ≈ 2.2 req/s on average, far under 50. The flush backlog of 2,000 fetches at 45 req/s drains in about 44 s while pages show a placeholder for cold tail products. The 20 hot keys get prioritised and are warm in under a second.</p>
   </div></details>
 </section>
 
 <section class="col">
-  <div class="eyebrow">Apply to your stack</div>
-  <h2>Laravel · Node · MongoDB · Kafka · AWS</h2>
+  <div class="eyebrow">In practice</div>
+  <h2>Where these ideas show up in real tools</h2>
   <div class="map">
-    <div><h3>Laravel</h3><p><code>Cache::flexible($key, [900, 7200], fn)</code> is the built-in stale-while-revalidate. It serves stale in the second window and refreshes in a deferred function after the response. For single-flight, wrap the miss in <code>Cache::lock("lock:$key", 10)-&gt;block(1, fn)</code> and catch <code>LockTimeoutException</code> to fall back to stale.</p></div>
-    <div><h3>Node.js</h3>
+    <div><h3>Application frameworks</h3><p>Many web frameworks ship a "serve stale while refreshing" cache helper and an atomic lock. Prefer those over hand-rolled code. Wrap the miss in the lock, wait only a short time, and fall back to the stale value if the lock isn't free.</p></div>
+    <div><h3>In-process single-flight</h3>
 <pre><code>const inflight = new Map();
 function once(key, fn) {
   if (inflight.has(key)) return inflight.get(key);
   const p = fn().finally(() =&gt; inflight.delete(key));
   inflight.set(key, p);
   return p;
-}</code></pre><p>This is per-task only. Layer the Redis <code>SET NX PX</code> lock behind it, and delete on release with a Lua compare-and-delete on the token.</p></div>
-    <div><h3>MongoDB</h3><p>If MongoDB is the price cache, put <code>softExp</code> and <code>delta</code> in the document and run a TTL index on <code>hardExp</code>. The TTL monitor runs about every 60 s, so don't rely on it for freshness. Check <code>softExp</code> in code.</p></div>
-    <div><h3>Kafka</h3><p>Use a refresh topic keyed by cache key, so duplicates hash to one partition and a consumer can drop a refresh if <code>fetchedAt</code> is already newer. Cap supplier throughput with consumer concurrency plus a shared token bucket, not partition count.</p></div>
-    <div><h3>AWS</h3><p>CloudFront already collapses simultaneous requests that share a cache key. A <code>Cache-Control: private</code>, <code>no-store</code> or <code>max-age=0</code> with min TTL 0 disables collapsing, so check your API's headers. ElastiCache (Redis) holds the locks and buckets. Fargate task count sets your local collapsing fan-out.</p></div>
+}</code></pre><p>The idea works in any language: one map of in-flight work per process. It only collapses requests inside one server, so layer a shared lock behind it, and release the lock with a compare-and-delete on the token.</p></div>
+    <div><h3>Databases as caches</h3><p>If a database holds the cached value, store the soft expiry and the recompute time in the row. Built-in expiry jobs usually run on a schedule, often about once a minute, so don't rely on them for freshness. Check the soft expiry in code.</p></div>
+    <div><h3>Queues and logs</h3><p>Send refreshes through a queue keyed by cache key, so duplicates land together and a consumer can drop one when the stored value is already newer. Cap load on the backend with consumer concurrency plus a shared token bucket, not with the number of partitions.</p></div>
+    <div><h3>CDNs and load balancers</h3><p>Many CDNs already collapse simultaneous requests for the same cache key. Headers such as <code>private</code>, <code>no-store</code> or <code>max-age=0</code> can turn that off, so check what your API sends. The number of app servers sets how wide the local fan-out is.</p></div>
   </div>
 </section>
 
@@ -266,7 +266,6 @@ function once(key, fn) {
     <li><a href="https://developers.cloudflare.com/cache/concepts/revalidation/">Cloudflare docs: Revalidation and request collapsing</a></li>
     <li><a href="https://www.fastly.com/documentation/guides/concepts/cache/request-collapsing/">Fastly docs: Request collapsing</a></li>
     <li><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/RequestAndResponseBehaviorS3Origin.html">AWS docs: CloudFront request and response behavior (simultaneous requests / collapsing)</a></li>
-    <li><a href="https://laravel.com/docs/12.x/cache">Laravel docs: Cache (<code>Cache::flexible</code>, atomic locks)</a></li>
     <li><a href="https://en.wikipedia.org/wiki/Cache_stampede">Wikipedia: Cache stampede (XFetch pseudocode, mitigation trade-offs)</a></li>
   </ol>
   <p class="muted" style="font-size:.85rem">The simulator is a simplified model: Poisson arrivals, a linear latency penalty past the concurrency limit, and immediate 429s above 3× the limit. The lease lane uses a fixed 10 s token interval, 50 ms retries and a 3 s give-up. Read its numbers for relative behaviour, not as benchmarks.</p>
