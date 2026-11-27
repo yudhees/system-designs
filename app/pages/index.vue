@@ -28,7 +28,7 @@ const parts = [
         <p class="free">No paywall, no account, no ads.</p>
       </div>
       <ClientOnly>
-        <HeroRing />
+        <HeroLB />
         <template #fallback><div class="ring-ph" aria-hidden="true" /></template>
       </ClientOnly>
     </section>
@@ -112,7 +112,7 @@ const parts = [
 .lede { font-size: 1.2rem; color: var(--muted); max-width: 46ch; }
 .ctas { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
 .free { font-size: .92rem; color: var(--muted); }
-.ring-ph { aspect-ratio: 1; max-width: 440px; width: 100%; margin-inline: auto; border-radius: 50%; border: 2px dashed var(--line); }
+.ring-ph { aspect-ratio: 460 / 340; max-width: 480px; width: 100%; margin-inline: auto; border-radius: var(--r-lg); border: 2px dashed var(--line); }
 @media (max-width: 900px) { .hero { grid-template-columns: 1fr; padding-top: 40px; } }
 
 .today { margin-top: 24px; }

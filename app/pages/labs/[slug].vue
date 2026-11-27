@@ -109,7 +109,7 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
       </ol>
     </details>
 
-    <div class="stage">
+    <div class="stage wrap">
       <iframe ref="frame" :src="lab.file" :title="`${lab.title} lab`" :style="{ height: `${height}px` }" class="frame" @load="onLoad" />
       <aside v-if="secs.length" class="toc" aria-label="On this page">
         <p class="cap">On this page</p>
@@ -166,6 +166,8 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
 .progress { position: fixed; top: 64px; left: 0; right: 0; height: 3px; z-index: 40; pointer-events: none; }
 .progress i { display: block; height: 100%; background: var(--signal); transform-origin: left; transform: scaleX(0); }
 .stage { display: block; }
+/* the lab document keeps its own 16px side padding, so trim the container's to line text up with the header */
+.stage { padding-inline: max(0px, calc(var(--gutter) - 16px)); }
 .toc, .mtoc { display: none; }
 .toc ol, .mtoc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .toc a, .mtoc a { display: block; padding: 7px 12px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; font-size: .92rem; }
@@ -174,8 +176,8 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
 .cap { font: 600 0.875rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px 12px; }
 .pct { margin: 12px 0 0 12px; font-size: 0.875rem; }
 @media (min-width: 1180px) {
-  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 232px; gap: 8px; padding-right: 24px; align-items: start; }
-  .toc { display: block; position: sticky; top: 96px; padding-top: 24px; }
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 40px; align-items: start; }
+  .toc { display: block; position: sticky; top: 96px; padding-top: 32px; }
 }
 @media (max-width: 1179px) {
   .mtoc { display: block; position: sticky; top: 64px; z-index: 30; background: var(--bg); border-bottom: 1px solid var(--line); }
