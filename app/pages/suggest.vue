@@ -41,7 +41,7 @@ const covered = computed(() => lessons.slice(0, 8))
 <style scoped>
 .page { padding-top: 56px; }
 .head { display: grid; gap: 14px; max-width: 760px; }
-.eyebrow { font: 500 .82rem var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--spark); }
+.eyebrow { font: 500 0.875rem var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--spark); }
 .head h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); }
 .lede { font-size: 1.12rem; max-width: 60ch; }
 .grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 56px; align-items: start; margin-top: 40px; }

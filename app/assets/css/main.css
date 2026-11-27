@@ -48,7 +48,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--f-body);
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -56,8 +56,8 @@ img, svg { max-width: 100%; }
 a { color: var(--signal); text-underline-offset: 3px; }
 a:hover { text-decoration-thickness: 2px; }
 :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 4px; }
-code { font-family: var(--f-mono); font-size: .88em; background: var(--sunk); padding: .1em .35em; border-radius: 4px; }
-pre { font-family: var(--f-mono); font-size: .85rem; background: var(--sunk); padding: 14px 16px; border-radius: var(--r-md); overflow-x: auto; line-height: 1.55; }
+code { font-family: var(--f-mono); font-size: max(14px, .88em); background: var(--sunk); padding: .1em .35em; border-radius: 4px; }
+pre { font-family: var(--f-mono); font-size: 0.875rem; background: var(--sunk); padding: 14px 16px; border-radius: var(--r-md); overflow-x: auto; line-height: 1.55; }
 pre code { background: none; padding: 0; }
 
 h1, h2, h3 { font-family: var(--f-display); line-height: 1.08; margin: 0; text-wrap: balance; letter-spacing: -0.02em; }
@@ -87,7 +87,7 @@ p { margin: 0; }
 .btn[disabled] { opacity: .55; cursor: default; }
 
 /* Topic tag: a small coloured dot plus text, not a pill soup */
-.topic { display: inline-flex; align-items: center; gap: 7px; font-size: .86rem; font-weight: 500; color: var(--muted); }
+.topic { display: inline-flex; align-items: center; gap: 7px; font-size: 0.875rem; font-weight: 500; color: var(--muted); }
 .topic::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot, var(--signal)); }
 
 /* Prose (articles) */

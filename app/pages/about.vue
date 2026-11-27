@@ -7,7 +7,7 @@ useSeoMeta({ title: 'About', description: `${author.name}, ${author.title}. ${au
 const strip = (u: string) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
 const contacts = computed(() => [
   author.email && { label: 'Email', href: `mailto:${author.email}`, text: author.email },
-  author.github && { label: 'GitHub', href: author.github, text: strip(author.github) },
+  author.showGithub && author.github && { label: 'GitHub', href: author.github, text: strip(author.github) },
   author.x && { label: 'X', href: author.x, text: strip(author.x) },
   author.website && { label: 'Website', href: author.website, text: strip(author.website) },
 ].filter(Boolean) as { label: string, href: string, text: string }[])
@@ -117,7 +117,7 @@ const initials = author.name.slice(0, 1).toUpperCase()
 .path li { counter-increment: path; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 0 12px 40px; border-top: 1px solid var(--line); position: relative; }
 .path li::before { content: counter(path); position: absolute; left: 0; font-family: var(--f-display); font-weight: 800; color: var(--signal); }
 .path a { font-weight: 600; }
-.path .topic { color: var(--muted); font-size: .85rem; display: inline-flex; align-items: center; gap: 6px; }
+.path .topic { color: var(--muted); font-size: 0.875rem; display: inline-flex; align-items: center; gap: 6px; }
 .path .topic i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .ask { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .ask li { border-left: 3px solid var(--signal); padding: 8px 14px; background: var(--surface); border-radius: 0 8px 8px 0; font-weight: 500; }
@@ -127,7 +127,7 @@ const initials = author.name.slice(0, 1).toUpperCase()
 .li { font-weight: 600; word-break: break-word; }
 .card ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .card li { display: grid; gap: 2px; font-size: .95rem; }
-.card li .muted { font-size: .82rem; }
+.card li .muted { font-size: 0.875rem; }
 .sub { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 4px; }
 .sub h3 { font-size: 1rem; }
 @media (max-width: 860px) {

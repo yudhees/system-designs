@@ -93,7 +93,7 @@ function again() {
 .sg { display: grid; gap: 20px; }
 .field { display: grid; gap: 8px; position: relative; }
 label { font-weight: 600; font-size: .95rem; }
-.req, .opt { font-weight: 500; font-size: .8rem; margin-left: 6px; color: var(--muted); }
+.req, .opt { font-weight: 500; font-size: 0.875rem; margin-left: 6px; color: var(--muted); }
 .req { color: var(--spark); }
 input[type=text], input[type=email], textarea {
   width: 100%; font: inherit; font-size: 1rem; color: var(--ink);
@@ -102,7 +102,7 @@ input[type=text], input[type=email], textarea {
 textarea { resize: vertical; min-height: 120px; line-height: 1.5; }
 input:focus, textarea:focus { outline: none; border-color: var(--signal); box-shadow: 0 0 0 3px var(--signal-soft); }
 input[aria-invalid=true] { border-color: var(--bad); }
-.count { font-size: .8rem; justify-self: end; }
+.count { font-size: 0.875rem; justify-self: end; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .hp { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
 .foot { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 4px; }

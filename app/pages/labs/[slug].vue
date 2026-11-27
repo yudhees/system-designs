@@ -171,8 +171,8 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
 .toc a, .mtoc a { display: block; padding: 7px 12px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; font-size: .92rem; }
 .toc a:hover, .mtoc a:hover { color: var(--ink); }
 .toc a.on, .mtoc a.on { color: var(--ink); border-left-color: var(--signal); font-weight: 600; }
-.cap { font: 600 .74rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px 12px; }
-.pct { margin: 12px 0 0 12px; font-size: .82rem; }
+.cap { font: 600 0.875rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px 12px; }
+.pct { margin: 12px 0 0 12px; font-size: 0.875rem; }
 @media (min-width: 1180px) {
   .stage { display: grid; grid-template-columns: minmax(0, 1fr) 232px; gap: 8px; padding-right: 24px; align-items: start; }
   .toc { display: block; position: sticky; top: 96px; padding-top: 24px; }
@@ -180,7 +180,7 @@ onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', s
 @media (max-width: 1179px) {
   .mtoc { display: block; position: sticky; top: 64px; z-index: 30; background: var(--bg); border-bottom: 1px solid var(--line); }
   .mtoc summary { cursor: pointer; padding: 12px 20px; font-weight: 600; font-size: .95rem; display: flex; gap: 10px; align-items: baseline; }
-  .mtoc summary .muted { font-weight: 400; font-size: .85rem; }
+  .mtoc summary .muted { font-weight: 400; font-size: 0.875rem; }
   .mtoc ol { padding: 0 20px 12px; }
 }
 @media (max-width: 560px) { .pager { grid-template-columns: 1fr; } .next { text-align: left; } }

@@ -137,7 +137,7 @@ svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .key.moved { stroke: var(--spark-fill); stroke-width: 3; }
 .hub { fill: var(--surface); stroke: var(--line); }
 .hub-n { text-anchor: middle; font: 800 26px var(--f-display); fill: var(--ink); }
-.hub-l { text-anchor: middle; font: 500 11px var(--f-body); fill: var(--muted); }
+.hub-l { text-anchor: middle; font: 500 14px var(--f-body); fill: var(--muted); }
 .req circle { fill: var(--spark-fill); animation: travel 1s cubic-bezier(.4, 0, .2, 1) forwards; }
 @keyframes travel {
   0% { transform: translate(0, 0); opacity: 1; }
@@ -146,7 +146,7 @@ svg { width: 100%; height: 100%; display: block; overflow: visible; }
 }
 .panel { display: grid; gap: 12px; justify-items: center; text-align: center; }
 .seg { display: inline-flex; background: var(--sunk); padding: 3px; border-radius: 999px; }
-.seg button { font: 600 .85rem var(--f-body); border: 0; background: none; color: var(--muted); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.seg button { font: 600 0.875rem var(--f-body); border: 0; background: none; color: var(--muted); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
 .seg button[aria-pressed=true] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(20, 35, 59, .12); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .readout { font-size: .93rem; color: var(--muted); max-width: 40ch; min-height: 3em; }

@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}code,sub,small,.mono{font-size:max(14px,.88em)!important}</style></head><body>
 <title>System Design Lab — Cache Stampedes (2026-11-24)</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +23,7 @@
   --hit:#3cc6a4; --stale:#e6a94a; --miss:#ff6c5f; --wait:#a88cf2; color-scheme:dark}
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.6;
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:18px;line-height:1.65;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 64px}
 .col{max-width:760px;margin:0 auto}
 .wide{max-width:1180px;margin:0 auto}
@@ -35,7 +35,7 @@ p{margin:0}
 a{color:var(--accent)}
 code,.mono{font-family:var(--f-mono);font-size:.88em}
 code{background:var(--sunk);padding:.08em .35em;border-radius:4px}
-.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-family:var(--f-mono);font-size:0.875rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 section{padding-block:48px 0;display:flex;flex-direction:column;gap:18px}
 .stack{display:flex;flex-direction:column;gap:14px}
 .muted{color:var(--muted)}
@@ -48,12 +48,12 @@ header.hero{padding-block:56px 8px;display:flex;flex-direction:column;gap:18px}
 .fact{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .fact b{font-family:var(--f-display);font-size:1.7rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .fact span{font-size:.9rem;color:var(--muted)}
-.fact a{font-size:.78rem}
+.fact a{font-size:0.875rem}
 
 .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 table{border-collapse:collapse;width:100%;min-width:640px;font-size:.92rem}
 th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
-th{font-family:var(--f-mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+th{font-family:var(--f-mono);font-size:0.875rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
 tr:last-child td{border-bottom:0}
 td:first-child{font-weight:600;white-space:nowrap}
 
@@ -61,34 +61,34 @@ td:first-child{font-weight:600;white-space:nowrap}
 .bench{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:18px}
 .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px}
 .ctl{display:flex;flex-direction:column;gap:4px;min-width:0}
-.ctl label{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;color:var(--muted)}
+.ctl label{display:flex;justify-content:space-between;gap:8px;font-size:0.875rem;color:var(--muted)}
 .ctl output{font-family:var(--f-mono);color:var(--ink);font-variant-numeric:tabular-nums}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
-.seg button,.btn{font:500 .85rem var(--f-body);border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:7px 12px;border-radius:999px;cursor:pointer}
+.seg button,.btn{font:500 0.875rem var(--f-body);border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:7px 12px;border-radius:999px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn:hover,.seg button:hover{border-color:var(--accent)}
 .btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.clock{margin-left:auto;font-family:var(--f-mono);font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.clock{margin-left:auto;font-family:var(--f-mono);font-size:0.875rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .stratnote{font-size:.9rem;background:var(--sunk);border-radius:8px;padding:10px 12px}
 .lanes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media (max-width:860px){.lanes{grid-template-columns:1fr}}
 .lane{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0;background:var(--bg)}
 .lane h3{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.lane h3 small{font:400 .8rem var(--f-mono);color:var(--muted)}
+.lane h3 small{font:400 0.875rem var(--f-mono);color:var(--muted)}
 canvas{display:block;width:100%}
 .cv-lane{height:210px}
 .cv-chart{height:84px}
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .metric{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
-.metric .k{font-size:.72rem;color:var(--muted);letter-spacing:.04em}
+.metric .k{font-size:0.875rem;color:var(--muted);letter-spacing:.04em}
 .metric .v{font-family:var(--f-mono);font-size:1.05rem;font-variant-numeric:tabular-nums;white-space:nowrap}
 .metric.bad .v{color:var(--miss)} .metric.warn .v{color:var(--stale)} .metric.ok .v{color:var(--hit)}
-.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:0.875rem;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-.chartcap{font-size:.75rem;color:var(--muted);font-family:var(--f-mono)}
+.chartcap{font-size:0.875rem;color:var(--muted);font-family:var(--f-mono)}
 
 /* solve */
 .scenario{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
@@ -101,7 +101,7 @@ details[open]>summary::before{content:"–"}
 details .body{padding:0 16px 16px;display:flex;flex-direction:column;gap:10px}
 details.answer{border-color:var(--accent)}
 .body ol,.body ul{margin:0;padding-left:1.25em;display:flex;flex-direction:column;gap:6px}
-pre{margin:0;background:var(--sunk);border-radius:8px;padding:12px 14px;overflow-x:auto;font-family:var(--f-mono);font-size:.82rem;line-height:1.5}
+pre{margin:0;background:var(--sunk);border-radius:8px;padding:12px 14px;overflow-x:auto;font-family:var(--f-mono);font-size:0.875rem;line-height:1.5}
 pre code{background:none;padding:0}
 .map{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
 .map>div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -149,7 +149,7 @@ pre code{background:none;padding:0}
   <div class="col stack" style="max-width:760px">
     <div class="eyebrow">Simulator</div>
     <h2>Watch the herd form</h2>
-    <p>Both lanes get the <em>same</em> arrival stream over a Zipf-distributed key set, so key 0 is hottest. The left lane is a plain TTL cache. The right lane uses the strategy you pick. The origin models a supplier API. Past its concurrency limit its latency grows, and above 3× the limit it rejects calls immediately with 429s. A rejected fetch leaves the cache empty, so the herd keeps going. Hit <strong>Flush cache</strong> to simulate a deploy, or <strong>Spike ×5</strong> to simulate a promo push.</p>
+    <p>Both lanes get the <em>same</em> arrival stream over a Zipf-distributed key set, so key 0 is hottest. The left lane is a plain TTL cache. The right lane uses the strategy you pick. The origin models a backend service with limited capacity. Past its concurrency limit its latency grows, and above 3× the limit it rejects calls immediately with 429s. A rejected fetch leaves the cache empty, so the herd keeps going. Hit <strong>Flush cache</strong> to simulate a deploy, or <strong>Spike ×5</strong> to simulate a promo push.</p>
   </div>
   <div class="bench" style="margin-top:18px">
     <div class="stack" style="gap:8px">
@@ -203,7 +203,7 @@ pre code{background:none;padding:0}
         <div class="chartcap">peak in-flight origin calls per 0.5 s · last 60 s · dashed = limit</div>
       </div>
     </div>
-    <p class="muted" style="font-size:.85rem">Things to try: (1) Single-flight at defaults, then raise keys to 48 and press Flush. The per-key herd disappears, but 48 simultaneous refreshes still hit a limit of 12. Add jitter. (2) XFetch: let it run through a few TTLs, where the right lane stays flat, then Flush. It stampedes like naive. (3) Lease with TTL 5 s. The 10 s token interval is longer than the TTL, so waiters time out. (4) SWR with δ = 3000 ms: p99 stays at cache latency while staleness rises.</p>
+    <p class="muted" style="font-size:0.875rem">Things to try: (1) Single-flight at defaults, then raise keys to 48 and press Flush. The per-key herd disappears, but 48 simultaneous refreshes still hit a limit of 12. Add jitter. (2) XFetch: let it run through a few TTLs, where the right lane stays flat, then Flush. It stampedes like naive. (3) Lease with TTL 5 s. The 10 s token interval is longer than the TTL, so waiters time out. (4) SWR with δ = 3000 ms: p99 stays at cache latency while staleness rises.</p>
   </div>
 </section>
 
@@ -268,7 +268,7 @@ function once(key, fn) {
     <li><a href="https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/RequestAndResponseBehaviorS3Origin.html">AWS docs: CloudFront request and response behavior (simultaneous requests / collapsing)</a></li>
     <li><a href="https://en.wikipedia.org/wiki/Cache_stampede">Wikipedia: Cache stampede (XFetch pseudocode, mitigation trade-offs)</a></li>
   </ol>
-  <p class="muted" style="font-size:.85rem">The simulator is a simplified model: Poisson arrivals, a linear latency penalty past the concurrency limit, and immediate 429s above 3× the limit. The lease lane uses a fixed 10 s token interval, 50 ms retries and a 3 s give-up. Read its numbers for relative behaviour, not as benchmarks.</p>
+  <p class="muted" style="font-size:0.875rem">The simulator is a simplified model: Poisson arrivals, a linear latency penalty past the concurrency limit, and immediate 429s above 3× the limit. The lease lane uses a fixed 10 s token interval, 50 ms retries and a 3 s give-up. Read its numbers for relative behaviour, not as benchmarks.</p>
 </section>
 
 <script>
@@ -376,7 +376,7 @@ function alpha(hex,a){if(!hex||hex[0]!=='#')return hex;const n=parseInt(hex.slic
 
 function drawLane(L){const [g,w,h]=fit(L.cv);g.clearRect(0,0,w,h);
   const cx=w*0.08, kx=w*0.36, kw=w*0.26, ox=w*0.78, ow=w*0.17;
-  g.font='500 11px "IBM Plex Mono", monospace';g.fillStyle=C.muted;g.textBaseline='top';
+  g.font='500 14px "IBM Plex Mono", monospace';g.fillStyle=C.muted;g.textBaseline='top';
   g.fillText('clients',4,4);g.fillText('cache',kx,4);g.fillText('origin',ox,4);
   // clients column
   for(let i=0;i<7;i++){g.fillStyle=alpha(C.muted,0.35);g.beginPath();g.arc(cx,30+i*(h-50)/6,4,0,Math.PI*2);g.fill();}
@@ -391,7 +391,7 @@ function drawLane(L){const [g,w,h]=fit(L.cv);g.clearRect(0,0,w,h);
     g.fillStyle=fill;rr(g,x,y,cwi,chi,3);g.fill();
     if(s.fetching){g.strokeStyle=C.wait;g.lineWidth=2;rr(g,x+1,y+1,cwi-2,chi-2,3);g.stroke();}
   }
-  g.fillStyle=L.waiting?C.wait:C.muted;g.font='500 11px "IBM Plex Mono", monospace';g.textBaseline='bottom';
+  g.fillStyle=L.waiting?C.wait:C.muted;g.font='500 14px "IBM Plex Mono", monospace';g.textBaseline='bottom';
   g.fillText(L.waiting?L.waiting.toLocaleString()+' waiting':'no waiters',kx+pad,ky+kh-5);
   // origin box
   const oy=22,oh=h-34;const flash=performance.now()-L.errFlash<350;
@@ -417,7 +417,7 @@ function drawCharts(){let ymax=P.cap*1.6;for(const L of lanes)for(const b of L.b
   const cur=Math.floor(simT/0.5);
   for(const L of lanes){const [g,w,h]=fit(L.ch);g.clearRect(0,0,w,h);const left=30,top=6,bot=h-14,pw=w-left-4,ph=bot-top;
     g.strokeStyle=C.line;g.lineWidth=1;g.beginPath();g.moveTo(left,bot+.5);g.lineTo(w-4,bot+.5);g.stroke();
-    g.fillStyle=C.muted;g.font='10px "IBM Plex Mono", monospace';g.textAlign='right';g.textBaseline='middle';
+    g.fillStyle=C.muted;g.font='14px "IBM Plex Mono", monospace';g.textAlign='right';g.textBaseline='middle';
     g.fillText(String(ymax),left-4,top+4);g.fillText('0',left-4,bot);
     g.textAlign='left';g.textBaseline='top';g.fillText('−60 s',left,bot+2);g.textAlign='right';g.fillText('now',w-4,bot+2);g.textAlign='left';
     const bw=pw/120;
