@@ -48,13 +48,12 @@ export default defineNuxtConfig({
     // vue-router 5 ships an unreplaced __VUE_OPTIONS_API__ flag; bundle it so the flag is defined on the server.
     externals: { inline: ['vue-router'] },
     replace: { __VUE_OPTIONS_API__: 'true' },
-    prerender: {
-      crawlLinks: true,
-      routes: ['/', '/labs', '/articles', '/about', '/suggest', '/rss.xml', '/sitemap.xml', '/robots.txt'],
-    },
   },
 
+  // Every page is rendered on the server per request (no prerender). The CDN keeps each response
+  // for a minute and serves a stale copy while it refreshes in the background, so it stays fast.
   routeRules: {
-    '/api/**': { prerender: false },
+    '/**': { prerender: false, headers: { 'cache-control': 'public, s-maxage=60, stale-while-revalidate=600' } },
+    '/api/**': { headers: { 'cache-control': 'no-store' } },
   },
 })
