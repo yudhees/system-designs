@@ -1,0 +1,78 @@
+# Merges pull requests from Claude threads once CI passes.
+#
+# Runs after every "CI" run. When CI succeeded on a pull request whose branch
+# starts with claude/, comes from this repository (not a fork), is not a
+# draft, has no "no-automerge" label, and CI tested the PR's latest commit,
+# this squash-merges it into main and deletes the branch. Vercel then deploys
+# main as usual.
+#
+# To keep a Claude PR open for review, mark it as a draft or add the
+# "no-automerge" label. It merges on the next green CI run after you undo that.
+#
+# workflow_run always uses this file as it is on main, so it starts working
+# once it has been merged there.
+name: Auto-merge
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-merge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.event.workflow_run.head_branch, 'claude/') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Find the pull request
+        id: pr
+        run: |
+          pr=$(gh pr list --head "$BRANCH" --base main --state open \
+            --json number,headRefOid,isDraft,labels \
+            --jq '.[0] // empty')
+          if [ -z "$pr" ]; then
+            echo "::notice::No open pull request into main for $BRANCH."
+            echo "ok=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          number=$(jq -r .number <<<"$pr")
+          head=$(jq -r .headRefOid <<<"$pr")
+          draft=$(jq -r .isDraft <<<"$pr")
+          optout=$(jq -r '[.labels[].name] | index("no-automerge") != null' <<<"$pr")
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          if [ "$head" != "$TESTED_SHA" ]; then
+            echo "::notice::PR #$number has newer commits than the CI run; waiting for their CI."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          elif [ "$draft" = "true" ]; then
+            echo "::notice::PR #$number is a draft; not merging."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          elif [ "$optout" = "true" ]; then
+            echo "::notice::PR #$number has the no-automerge label; not merging."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Squash-merge
+        if: steps.pr.outputs.ok == 'true'
+        run: |
+          # --match-head-commit refuses the merge if someone pushed after CI ran.
+          gh pr merge "${{ steps.pr.outputs.number }}" --squash \
+            --match-head-commit "$TESTED_SHA"
+          gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$BRANCH" \
+            || echo "::notice::Could not delete $BRANCH (already gone?)."
