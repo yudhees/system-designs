@@ -34,8 +34,9 @@ function onLoad() {
   const doc = frame.value?.contentDocument
   if (!doc) return
   syncTheme()
-  const measure = () => { height.value = Math.max(600, doc.documentElement.scrollHeight) }
+  const measure = () => { height.value = Math.max(600, doc.documentElement.scrollHeight); spy() }
   measure()
+  buildToc()
   ro?.disconnect()
   ro = new ResizeObserver(measure)
   ro.observe(doc.body)
@@ -43,7 +44,44 @@ function onLoad() {
   doc.querySelectorAll('a[href]').forEach((a) => { if (!a.getAttribute('href')!.startsWith('#')) a.setAttribute('target', '_blank'); a.setAttribute('rel', 'noopener') })
 }
 watch(theme, syncTheme)
-onBeforeUnmount(() => ro?.disconnect())
+
+// "On this page": built from each lab's own sections, so new labs get it for free.
+interface Sec { id: string, label: string, el: HTMLElement }
+const secs = ref<Sec[]>([])
+const active = ref('')
+const progress = ref(0)
+const menu = ref<HTMLDetailsElement>()
+function buildToc() {
+  const doc = frame.value?.contentDocument
+  if (!doc) return
+  const out: Sec[] = []
+  doc.querySelectorAll<HTMLElement>('body section').forEach((el, i) => {
+    const h = el.querySelector('h2')
+    if (!h) return
+    const eyebrow = el.querySelector('.eyebrow')?.textContent?.trim()
+    const label = eyebrow || h.textContent?.trim() || `Section ${i + 1}`
+    const id = el.id || `sec-${i + 1}`
+    out.push({ id, label, el })
+  })
+  secs.value = out
+  spy()
+}
+function frameTop() { return (frame.value?.getBoundingClientRect().top ?? 0) }
+function spy() {
+  const ft = frameTop()
+  let cur = ''
+  for (const s of secs.value) if (ft + s.el.getBoundingClientRect().top <= 140) cur = s.id
+  active.value = cur
+  const total = height.value - window.innerHeight
+  progress.value = total > 0 ? Math.min(1, Math.max(0, -ft / total)) : 0
+}
+function go(s: Sec) {
+  const y = window.scrollY + frameTop() + s.el.getBoundingClientRect().top - 84
+  window.scrollTo({ top: y, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+  if (menu.value) menu.value.open = false
+}
+onMounted(() => { window.addEventListener('scroll', spy, { passive: true }); window.addEventListener('resize', spy) })
+onBeforeUnmount(() => { ro?.disconnect(); window.removeEventListener('scroll', spy); window.removeEventListener('resize', spy) })
 </script>
 
 <template>
@@ -62,7 +100,25 @@ onBeforeUnmount(() => ro?.disconnect())
       </div>
     </header>
 
-    <iframe ref="frame" :src="lab.file" :title="`${lab.title} lab`" :style="{ height: `${height}px` }" class="frame" @load="onLoad" />
+    <div class="progress" aria-hidden="true"><i :style="{ transform: `scaleX(${progress})` }" /></div>
+
+    <details v-if="secs.length" ref="menu" class="mtoc">
+      <summary>On this page <span class="muted">{{ secs.find(x => x.id === active)?.label }}</span></summary>
+      <ol>
+        <li v-for="x in secs" :key="x.id"><a href="#" :class="{ on: x.id === active }" @click.prevent="go(x)">{{ x.label }}</a></li>
+      </ol>
+    </details>
+
+    <div class="stage">
+      <iframe ref="frame" :src="lab.file" :title="`${lab.title} lab`" :style="{ height: `${height}px` }" class="frame" @load="onLoad" />
+      <aside v-if="secs.length" class="toc" aria-label="On this page">
+        <p class="cap">On this page</p>
+        <ol>
+          <li v-for="x in secs" :key="x.id"><a href="#" :class="{ on: x.id === active }" :aria-current="x.id === active ? 'true' : undefined" @click.prevent="go(x)">{{ x.label }}</a></li>
+        </ol>
+        <p class="pct muted">{{ Math.round(progress * 100) }}% read</p>
+      </aside>
+    </div>
 
     <footer class="wrap end">
       <div class="done-row">
@@ -106,5 +162,26 @@ onBeforeUnmount(() => ro?.disconnect())
 .next { text-align: right; }
 .sub { display: grid; gap: 14px; background: var(--signal-soft); border-radius: var(--r-lg); padding: 32px; }
 .sub h2 { font-size: 1.5rem; }
+
+.progress { position: fixed; top: 64px; left: 0; right: 0; height: 3px; z-index: 40; pointer-events: none; }
+.progress i { display: block; height: 100%; background: var(--signal); transform-origin: left; transform: scaleX(0); }
+.stage { display: block; }
+.toc, .mtoc { display: none; }
+.toc ol, .mtoc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.toc a, .mtoc a { display: block; padding: 7px 12px; border-left: 2px solid var(--line); color: var(--muted); text-decoration: none; font-size: .92rem; }
+.toc a:hover, .mtoc a:hover { color: var(--ink); }
+.toc a.on, .mtoc a.on { color: var(--ink); border-left-color: var(--signal); font-weight: 600; }
+.cap { font: 600 .74rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px 12px; }
+.pct { margin: 12px 0 0 12px; font-size: .82rem; }
+@media (min-width: 1180px) {
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 232px; gap: 8px; padding-right: 24px; align-items: start; }
+  .toc { display: block; position: sticky; top: 96px; padding-top: 24px; }
+}
+@media (max-width: 1179px) {
+  .mtoc { display: block; position: sticky; top: 64px; z-index: 30; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .mtoc summary { cursor: pointer; padding: 12px 20px; font-weight: 600; font-size: .95rem; display: flex; gap: 10px; align-items: baseline; }
+  .mtoc summary .muted { font-weight: 400; font-size: .85rem; }
+  .mtoc ol { padding: 0 20px 12px; }
+}
 @media (max-width: 560px) { .pager { grid-template-columns: 1fr; } .next { text-align: left; } }
 </style>
