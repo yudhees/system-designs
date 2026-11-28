@@ -67,12 +67,24 @@ jobs:
 
       - name: Fast-forward main
         if: steps.scope.outputs.only == 'true'
+        env:
+          LESSON_FILES: ${{ steps.scope.outputs.files }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Only new files, so replaying them onto the latest main can't conflict.
-          git rebase origin/main
-          git push origin HEAD:main
+          # Copy just the new lesson files onto the latest main as one commit. Rebasing the whole
+          # branch would replay commits that main already has and can conflict.
+          sha=$(git rev-parse HEAD)
+          msg=$(git log -1 --format=%s "$sha")
+          git checkout -B publish origin/main
+          # shellcheck disable=SC2086
+          git checkout "$sha" -- $LESSON_FILES
+          if git diff --cached --quiet; then
+            echo "Main already has these lessons; nothing to publish."
+          else
+            git commit -m "$msg"
+            git push origin HEAD:main
+          fi
           git push origin --delete "${GITHUB_REF_NAME}" || true
 
       - name: Announce in the newsletter (Kit)
